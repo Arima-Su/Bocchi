@@ -2,6 +2,7 @@
 using Alice_Module.Loaders;
 using Discord;
 using DSharpPlus;
+using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Entities;
 using DSharpPlus.Lavalink;
 using DSharpPlus.Net;
@@ -15,7 +16,6 @@ namespace Alice.Commands
 {
     public class SlashComms : ApplicationCommandModule
     {
-        //public static List<LavalinkTrack> songQueue = new List<LavalinkTrack>(); // List to store the queued songs
         public static Dictionary<ulong, List<LavalinkTrack>> _queueDictionary = new Dictionary<ulong, List<LavalinkTrack>>();
         public static int MaxQueueSize = 30; // Maximum number of songs allowed in the queue
         public static bool _lavastarted = false;
@@ -63,7 +63,7 @@ namespace Alice.Commands
                         _invited = true;
                         _ready = true;
                         await node.ConnectAsync(channel);
-                        Console.WriteLine("JOINED");
+                        //Console.WriteLine("JOINED");
                         var ephemeralMessage = new DiscordInteractionResponseBuilder()
                         .WithContent("Thanks..")
                         .AsEphemeral(true); // Set ephemeral to true to make the message visible only to the user
@@ -129,7 +129,7 @@ namespace Alice.Commands
                     {
                         _invited = false;
                         await node.ConnectAsync(channel);
-                        Console.WriteLine("JOINED");
+                        //Console.WriteLine("JOINED");
                         _ready = true;
                     }
                     catch
@@ -246,14 +246,21 @@ namespace Alice.Commands
                     _queueDictionary[guild].RemoveAt(1);
                     await conn.PlayAsync(track);
                     var ephemeralMessage = new DiscordFollowupMessageBuilder()
-                        .WithContent($"Found it. Now Playing: {track.Title}")
+                        .WithContent($"Found it. Now Playing: {track.Title} {track.Author}")
                         .AsEphemeral(true);
 
                     await ctx.FollowUpAsync(ephemeralMessage);
                     Program.skipped = false;
                     Console.WriteLine("PLAYER IS PLAYING");
-                    Console.WriteLine($"NOW PLAYING: {track.Title}");
-                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", track.Title);
+                    if (SlashComms._queueDictionary.Count > 1)
+                    {
+                        Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
+                    }
+                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
                 }
                 else
                 {
@@ -263,23 +270,38 @@ namespace Alice.Commands
                     _queueDictionary[guild].RemoveAt(1);
                     await conn.PlayAsync(track);
                     var ephemeralMessage = new DiscordFollowupMessageBuilder()
-                        .WithContent($"Found it. Now Playing: {track.Title}")
+                        .WithContent($"Found it. Now Playing: {track.Title} {track.Author}")
                         .AsEphemeral(true);
 
                     await ctx.FollowUpAsync(ephemeralMessage);
                     Program.skipped = false;
                     Console.WriteLine("PLAYER IS PLAYING");
-                    Console.WriteLine($"NOW PLAYING: {track.Title}");
-                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", track.Title);
+                    if (SlashComms._queueDictionary.Count > 1)
+                    {
+                        Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
+                    }
+                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
                 }
             }
             catch
             {
-                var ephemeralMessage = new DiscordFollowupMessageBuilder()
-                    .WithContent($"{track.Title} failed to play")
+                var ephemeralMessage4 = new DiscordFollowupMessageBuilder()
+                    .WithContent($"{track.Title} {track.Author} failed to play")
                     .AsEphemeral(true);
 
-                await ctx.FollowUpAsync(ephemeralMessage);
+                await ctx.FollowUpAsync(ephemeralMessage4);
+
+                var ephemeralMessage41 = new DiscordFollowupMessageBuilder()
+                    .WithContent("I'm gonna try that again..")
+                    .AsEphemeral(true);
+
+                await ctx.FollowUpAsync(ephemeralMessage41);
+
+                await PlaySkipCommand(ctx, search);
             }
         }
 
@@ -322,7 +344,7 @@ namespace Alice.Commands
                     {
                         _invited = false;
                         await node.ConnectAsync(channel);
-                        Console.WriteLine("JOINED");
+                        //Console.WriteLine("JOINED");
                         _ready = true;
                         Console.WriteLine("Auto Connected");
                     }
@@ -449,15 +471,22 @@ namespace Alice.Commands
                     Program.skipped = true;
                     await conn.PlayAsync(track);
                     var ephemeralMessage1 = new DiscordFollowupMessageBuilder()
-                        .WithContent($"Now Playing: {track.Title}")
+                        .WithContent($"Now Playing: {track.Title} {track.Author}")
                         .AsEphemeral(true);
 
                     await ctx.FollowUpAsync(ephemeralMessage1);
                     Program.skipped = false;
 
                     Console.WriteLine("PLAYER IS PLAYING");
-                    Console.WriteLine($"NOW PLAYING: {track.Title}");
-                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", track.Title);
+                    if (SlashComms._queueDictionary.Count > 1)
+                    {
+                        Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
+                    }
+                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
                 }
                 else
                 {
@@ -473,7 +502,7 @@ namespace Alice.Commands
                     {
                         _queueDictionary[guild].Add(track);
                         var ephemeralMessage3 = new DiscordFollowupMessageBuilder()
-                            .WithContent($"Added to Queue: {track.Title}")
+                            .WithContent($"Added to Queue: {track.Title} {track.Author}")
                             .AsEphemeral(true);
 
                         await ctx.FollowUpAsync(ephemeralMessage3);
@@ -483,10 +512,18 @@ namespace Alice.Commands
             catch
             {
                 var ephemeralMessage4 = new DiscordFollowupMessageBuilder()
-                    .WithContent($"{track.Title} failed to play")
+                    .WithContent($"{track.Title} {track.Author} failed to play")
                     .AsEphemeral(true);
 
                 await ctx.FollowUpAsync(ephemeralMessage4);
+
+                var ephemeralMessage41 = new DiscordFollowupMessageBuilder()
+                    .WithContent("I'm gonna try that again..")
+                    .AsEphemeral(true);
+
+                await ctx.FollowUpAsync(ephemeralMessage41);
+
+                await PlayCommand(ctx, search);
             }
         }
 
@@ -531,7 +568,7 @@ namespace Alice.Commands
             if (conn.CurrentState.CurrentTrack != null)                                               // NOW PLAYING COMMAND
             {
                 var currentTrack = conn.CurrentState.CurrentTrack;
-                var trackInfo = $"Now Playing: {currentTrack.Title} {currentTrack.Length}";
+                var trackInfo = $"Now Playing: {currentTrack.Title} {currentTrack.Author} [{currentTrack.Length}]";
 
                 var ephemeralMessage = new DiscordInteractionResponseBuilder()
                     .WithContent(trackInfo)
@@ -683,13 +720,24 @@ namespace Alice.Commands
                 await conn.ResumeAsync();
             }
         }
-
+        /*
         [SlashCommand("stop", "Halt.")]
         public async Task StopCommand(InteractionContext ctx)
         {
             var lava = ctx.Client.GetLavalink();
-            var node = lava.ConnectedNodes.Values.First();
-            var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
+            if (lava != null)
+            {
+                var node = lava.ConnectedNodes.Values.First();
+                if (node != null)
+                {
+                    var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
+                    if (conn != null)
+                    {
+                        await conn.StopAsync();
+                    }
+                }
+            }
+
             ulong guild = ctx.Guild.Id;
 
             if (_lavastarted == false)                                                                    // LAVALINK CHECK
@@ -731,7 +779,7 @@ namespace Alice.Commands
                 SlashComms._lavastarted = false;
             }
         }
-
+        */
         [SlashCommand("queue", "Show the list of songs requested by abiders of social norms.. Silently..")]
         public async Task QueueCommand(InteractionContext ctx)
         {
@@ -760,7 +808,7 @@ namespace Alice.Commands
                 var queueContent = string.Join("\n", _queueDictionary[guild].Select((track, index) =>
                 {
                     var prefix = index == 0 ? "【Now Playing】 " : string.Empty;
-                    return $"{index + 1}. {prefix}{track.Title}";
+                    return $"{index + 1}. {prefix}{track.Title} {track.Author}";
                 }));
 
                 var ephemeralMessage = new DiscordInteractionResponseBuilder()
@@ -922,7 +970,14 @@ namespace Alice.Commands
 
                 await ctx.CreateResponseAsync(ephemeralMessage2);
                 Program.skipped = false;
-                Console.WriteLine($"NOW PLAYING: {nextTrackTitle}");
+                if (SlashComms._queueDictionary.Count > 1)
+                {
+                    Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                }
+                else
+                {
+                    Console.WriteLine($"NOW PLAYING: {nextTrackTitle} {nextTrack.Author}");
+                }
                 await Program.UpdateUserStatus(ctx.Client, "LISTENING", nextTrackTitle);
                 return;
             }
@@ -1004,12 +1059,19 @@ namespace Alice.Commands
             await conn.PlayAsync(currentTrack);
 
             var ephemeralMessage = new DiscordInteractionResponseBuilder()
-                .WithContent($"Removed {tracksToRemove.Count} tracks from the queue.. Now Playing {currentTrack.Title}")
+                .WithContent($"Removed {tracksToRemove.Count} tracks from the queue.. Now Playing {currentTrack.Title} {currentTrack.Author}")
                 .AsEphemeral(true);
 
             await ctx.CreateResponseAsync(ephemeralMessage);
-            Console.WriteLine($"NOW PLAYING: {currentTrack.Title}");
-            await Program.UpdateUserStatus(ctx.Client, "LISTENING", currentTrack.Title);
+            if (SlashComms._queueDictionary.Count > 1)
+            {
+                Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+            }
+            else
+            {
+                Console.WriteLine($"NOW PLAYING: {currentTrack.Title} {currentTrack.Author}");
+            }
+            await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{currentTrack.Title} {currentTrack.Author}");
             Program.skipped = false;
         }
 
@@ -1108,7 +1170,7 @@ namespace Alice.Commands
             {
                 var track = SlashComms._queueDictionary[guild][0];
                 var ephemeralMessage2 = new DiscordInteractionResponseBuilder()
-                        .WithContent($"Skipped {track.Title}")
+                        .WithContent($"Skipped {track.Title} {track.Author}")
                         .AsEphemeral(true); // Set ephemeral to true to make the message visible only to the user
 
                 await ctx.CreateResponseAsync(ephemeralMessage2);
@@ -1128,12 +1190,19 @@ namespace Alice.Commands
                 _queueDictionary[guild].RemoveAt(0);
 
                 var ephemeralMessage2 = new DiscordInteractionResponseBuilder()
-                        .WithContent($"Skipped {trackTitle}..")
+                        .WithContent($"Skipped {trackTitle} {track.Author}..")
                         .AsEphemeral(true); // Set ephemeral to true to make the message visible only to the user
 
                 await ctx.CreateResponseAsync(ephemeralMessage2);
-                Console.WriteLine($"NOW PLAYING: {nextTrackTitle}");
-                await Program.UpdateUserStatus(ctx.Client, "LISTENING", nextTrackTitle);
+                if (SlashComms._queueDictionary.Count > 1)
+                {
+                    Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                }
+                else
+                {
+                    Console.WriteLine($"NOW PLAYING: {nextTrackTitle} {nextTrack.Author}");
+                }
+                await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{nextTrackTitle} {nextTrack.Author}");
                 Program.skipped = false;
             }
             else
@@ -1169,6 +1238,7 @@ namespace Alice.Commands
                 .AddField("queue", "Shows song queue.")
                 .AddField("resume", "Resumes the current song.")
                 .AddField("pause", "Pauses the current song.")
+                .AddField("loop", "Loops the current song.")
                 .AddField("help", "Displays this list.")
                 .AddField("\u200B", "\u200B")
                 .AddField("Others", "Sometimes specific words can trigger a bocchi response..")
@@ -1293,6 +1363,16 @@ namespace Alice.Commands
             await ctx.DeferAsync(ephemeral: true);
             List<string> songTitles;
 
+            if (_lavastarted == false)                                                                    // LAVALINK CHECK
+            {
+                var ephemeralMessage1 = new DiscordInteractionResponseBuilder()
+                    .WithContent("Please execute /start first so I can boot up the music player..")
+                    .AsEphemeral(true);
+
+                await ctx.CreateResponseAsync(ephemeralMessage1);
+                return;
+            }
+
             if (Validates.IsYouTubePlaylistLink(list))
             {
                 songTitles = await SlashPlayLoader.YoutubeLoaderAsync(list);
@@ -1381,6 +1461,66 @@ namespace Alice.Commands
 
                 await ctx.FollowUpAsync(ephemeralMessage1);
                 return;
+            }
+        }
+
+        [SlashCommand("loop", "Shawty's like a melody in my head..")]
+        public async Task LoopCommand(InteractionContext ctx)
+        {
+            ulong guild = ctx.Guild.Id;
+            
+            if (Program.loop.Contains(guild))
+            {
+                Program.loop.Remove(guild);
+                var ephemeralMessage1 = new DiscordInteractionResponseBuilder()
+                    .WithContent("Finally, we can move on..")
+                    .AsEphemeral(true);
+
+                await ctx.CreateResponseAsync(ephemeralMessage1);
+            }
+            else
+            {
+                Program.loop.Add(guild);
+                var ephemeralMessage1 = new DiscordInteractionResponseBuilder()
+                    .WithContent("This song's boutta get stuck in your head..")
+                    .AsEphemeral(true);
+
+                await ctx.CreateResponseAsync(ephemeralMessage1);
+            }
+        }
+
+        [SlashCommand("stop", "Halt.")]
+        public async Task StopCommand(InteractionContext ctx)
+        {
+            if (SlashComms._lavastarted == false)                                                                    // LAVALINK CHECK
+            {
+                var ephemeralMessage1 = new DiscordInteractionResponseBuilder()
+                    .WithContent("Please execute /start first so I can boot up the music player..")
+                    .AsEphemeral(true);
+
+                await ctx.CreateResponseAsync(ephemeralMessage1);
+                return;
+            }
+
+            ulong guild = ctx.Guild.Id;
+            var lava = ctx.Client.GetLavalink();
+            var node = lava.ConnectedNodes.Values.First();
+            var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
+
+            try
+            {
+                Program.skipped = true;
+                await conn.StopAsync();
+                SlashComms._queueDictionary.Remove(guild);
+                Program.skipped = false;
+            }
+            catch
+            {
+                var ephemeralMessage1 = new DiscordInteractionResponseBuilder()
+                    .WithContent("Stop it? It's already dead..")
+                    .AsEphemeral(true);
+
+                await ctx.CreateResponseAsync(ephemeralMessage1);
             }
         }
     }

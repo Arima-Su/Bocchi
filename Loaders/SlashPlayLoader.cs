@@ -211,14 +211,21 @@ namespace Alice_Module.Loaders
                         Program.skipped = true;
                         await conn.PlayAsync(track);
                         var ephemeralMessage1 = new DiscordFollowupMessageBuilder()
-                            .WithContent($"Now Playing: {track.Title}")
+                            .WithContent($"Now Playing: {track.Title} {track.Author}")
                             .AsEphemeral(true);
 
                         await ctx.FollowUpAsync(ephemeralMessage1);
                         Console.WriteLine("PLAYER IS PLAYING");
-                        Console.WriteLine($"NOW PLAYING: {track.Title}");
+                        if (SlashComms._queueDictionary.Count > 1)
+                        {
+                            Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
+                        }
                         Program.skipped = false;
-                        await Program.UpdateUserStatus(ctx.Client, "LISTENING", track.Title);
+                        await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
                     }
                     else
                     {
@@ -236,14 +243,21 @@ namespace Alice_Module.Loaders
                         Program.skipped = true;
                         await conn.PlayAsync(track);
                         var ephemeralMessage1 = new DiscordFollowupMessageBuilder()
-                            .WithContent($"Now Playing: {track.Title}")
+                            .WithContent($"Now Playing: {track.Title} {track.Author}")
                             .AsEphemeral(true);
 
                         await ctx.FollowUpAsync(ephemeralMessage1);
                         Console.WriteLine("PLAYER IS PLAYING");
-                        Console.WriteLine($"NOW PLAYING: {track.Title}");
+                        if (SlashComms._queueDictionary.Count > 1)
+                        {
+                            Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
+                        }
                         Program.skipped = false;
-                        await Program.UpdateUserStatus(ctx.Client, "LISTENING", track.Title);
+                        await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
                     }
                 }
                 else
@@ -275,7 +289,7 @@ namespace Alice_Module.Loaders
             catch
             {
                 var ephemeralMessage4 = new DiscordFollowupMessageBuilder()
-                    .WithContent($"{track.Title} failed to play")
+                    .WithContent($"{track.Title} {track.Author} failed to play")
                     .AsEphemeral(true);
 
                 await ctx.FollowUpAsync(ephemeralMessage4);

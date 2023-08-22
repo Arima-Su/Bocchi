@@ -15,6 +15,9 @@ using Alice.Responses;
 using System.Xml.Linq;
 using System.Diagnostics;
 using System.Threading;
+using AngleSharp.Media.Dom;
+using System.Reflection;
+using System.Collections.Generic;
 
 namespace Alice
 {
@@ -22,12 +25,14 @@ namespace Alice
     {
         public static string Alice;
         public static bool skipped = false;
+        public static List<ulong> loop = new List<ulong>();
         public static string prefix;
         public static Process lavalinkProcess;
         public static CommandsNextConfiguration commandsConfig;
-        private static DiscordClient discord;
+        public static DiscordClient discord;
         static XDocument doc = XDocument.Load("data.xml");
         private static Timer disconnectionTimer;
+        public static XElement tokenElement;
 
         static async Task Main(string[] args)
         {
@@ -41,7 +46,7 @@ namespace Alice
             var logFactory = new LoggerFactory().AddSerilog();
 
             
-            XElement tokenElement = doc.Descendants("category")
+            tokenElement = doc.Descendants("category")
                 .FirstOrDefault(category => category.Attribute("name")?.Value == "token")?
                 .Element("entry");
             XElement prefixElement = doc.Descendants("category")
@@ -113,40 +118,6 @@ namespace Alice
             }
         }
 
-        //public static async Task PlaybackFinishedHandler(LavalinkGuildConnection sender, TrackFinishEventArgs e)
-        //{
-        //    if (skipped == true)
-        //    {
-        //        return;
-        //    }
-        //    else
-        //    {
-        //        if (SlashComms.songQueue.Count > 0)
-        //        {
-        //            if (SlashComms.songQueue.Count == 1)
-        //            {
-        //                SlashComms.songQueue.RemoveAt(0);
-        //                Console.WriteLine("SONG ENDED");
-        //                return;
-        //            }
-        //            else
-        //            {
-        //                var nextTrack = SlashComms.songQueue[1];
-        //                SlashComms.songQueue.RemoveAt(0);
-
-        //                skipped = true;
-        //                await sender.PlayAsync(nextTrack);
-        //                Console.WriteLine($"NOW PLAYING: {nextTrack.Title}");
-        //                skipped = false;
-        //                return;
-        //            }
-        //        }
-        //        else
-        //        {
-        //            return;
-        //        }
-        //    }
-        //}
         public static async Task PlaybackFinishedHandler(LavalinkGuildConnection sender, TrackFinishEventArgs e)
         {
             if (skipped == true)
@@ -157,35 +128,60 @@ namespace Alice
             {
                 ulong guild = sender.Guild.Id;
 
-                if (SlashComms._queueDictionary[guild].Count > 0)
+                if (SlashComms._queueDictionary[guild] != null)
                 {
-                    if (SlashComms._queueDictionary[guild].Count == 1)
+                    if (SlashComms._queueDictionary[guild].Count > 0)
                     {
-                        SlashComms._queueDictionary[guild].RemoveAt(0);
-                        SlashComms._queueDictionary.Remove(guild);
-                        Console.WriteLine("SONG ENDED");
-                        Console.WriteLine("JOINED");
-                        string status = MessageHandler.GetRandomEntry("state");
-                        await Program.UpdateUserStatus(discord, "IDLE", status);
-                        return;
-                    }
-                    else
-                    {
-                        var nextTrack = SlashComms._queueDictionary[guild][1];
-                        SlashComms._queueDictionary[guild].RemoveAt(0);
-
-                        skipped = true;
-                        await sender.PlayAsync(nextTrack);
-                        Console.WriteLine($"NOW PLAYING: {nextTrack.Title}");
-                        if (SlashComms._queueDictionary.Count > 1)
+                        if (loop.Contains(guild))
                         {
-                            await Program.UpdateUserStatus(discord, "CONCURRENT", "backflip");
+                            var loopTrack = SlashComms._queueDictionary[guild][0];
+                            skipped = true;
+                            await sender.PlayAsync(loopTrack);
+                            skipped = false;
                         }
                         else
                         {
-                            await Program.UpdateUserStatus(discord, "LISTENING", nextTrack.Title);
+                            if (SlashComms._queueDictionary[guild].Count == 1)
+                            {
+                                SlashComms._queueDictionary[guild].RemoveAt(0);
+                                SlashComms._queueDictionary.Remove(guild);
+                                Console.WriteLine("SONG ENDED");
+                                Console.WriteLine("JOINED");
+                                string status = MessageHandler.GetRandomEntry("state");
+                                await Program.UpdateUserStatus(discord, "IDLE", status);
+                                return;
+                            }
+                            else
+                            {
+                                var nextTrack = SlashComms._queueDictionary[guild][1];
+                                SlashComms._queueDictionary[guild].RemoveAt(0);
+
+                                try
+                                {
+                                    skipped = true;
+                                    await sender.PlayAsync(nextTrack);
+
+                                    if (SlashComms._queueDictionary.Count > 1)
+                                    {
+                                        await Program.UpdateUserStatus(discord, "CONCURRENT", "backflip");
+                                        Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                                    }
+                                    else
+                                    {
+                                        await Program.UpdateUserStatus(discord, "LISTENING", $"{nextTrack.Title} {nextTrack.Author}");
+                                        Console.WriteLine($"NOW PLAYING: {nextTrack.Title} {nextTrack.Author}");
+                                    }
+                                    skipped = false;
+                                }
+                                catch
+                                {
+                                    await RetryAsync(sender, nextTrack);
+                                }
+                            }
                         }
-                        skipped = false;
+                    }
+                    else
+                    {
                         return;
                     }
                 }
@@ -196,6 +192,33 @@ namespace Alice
             }
         }
 
+        public static async Task RetryAsync(LavalinkGuildConnection conn, LavalinkTrack track)
+        {
+            Console.WriteLine("Retried..");
+            try
+            {
+                skipped = true;
+                await conn.PlayAsync(track);
+
+                if (SlashComms._queueDictionary.Count > 1)
+                {
+                    await Program.UpdateUserStatus(discord, "CONCURRENT", "backflip");
+                    Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                }
+                else
+                {
+                    await Program.UpdateUserStatus(discord, "LISTENING", $"{track.Title} {track.Author}");
+                    Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
+                }
+                skipped = false;
+            }
+            catch
+            {
+                Console.WriteLine("Well that failed, I'll try that again..");
+                await RetryAsync(conn, track);
+            }
+        }
+
         public static async Task DisconnectionHandler(DiscordClient client, VoiceStateUpdateEventArgs e)
         {
             if (e.User == client.CurrentUser)
@@ -203,35 +226,111 @@ namespace Alice
                 ulong guild = e.Guild.Id;
                 var guildconn = e.Guild;
 
+                if (SlashComms._queueDictionary.ContainsKey(guild))
+                {
+                    SlashComms._queueDictionary.Remove(guild);
+                }
 
                 if (e.After?.Channel == null)
                 {
-                    Console.WriteLine("LEFT");
-                    SlashComms._queueDictionary.Remove(guild);
+                    if (SlashComms._queueDictionary.Count > 1)
+                    {
+                        Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                    }
+                    else if (SlashComms._queueDictionary.Count == 1)
+                    {
+                        var remainingList = SlashComms._queueDictionary.Values.FirstOrDefault();
+
+                        if (remainingList != null)
+                        {
+                            if (remainingList[0] != null)
+                            {
+                                var currentTrack = remainingList[0];
+
+                                Console.WriteLine("PLAYER IS PLAYING");
+                                Console.WriteLine($"NOW PLAYING: {currentTrack.Title} {currentTrack.Author}");
+                                await Program.UpdateUserStatus(client, "LISTENING", $"{currentTrack.Title} {currentTrack.Author}");
+                            }
+                            
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("LEFT");
+                        await Program.UpdateUserStatus(client, "IDLE", "bocchi");
+                    }
+
                     var lava = client.GetLavalink();
                     var node = lava.ConnectedNodes.Values.First();
                     var conn = node.GetGuildConnection(guildconn);
-                    await conn.StopAsync();
 
-                    disconnectionTimer = new Timer(TimerCallback, guild, TimeSpan.FromSeconds(15), Timeout.InfiniteTimeSpan);
+                    if (loop.Contains(guild))
+                    {
+                        loop.Remove(guild);
+                    }
+                    
+                    if (conn != null)
+                    {
+                        Program.skipped = true;
+                        await conn.StopAsync();
+                        Program.skipped = false;
+                    }
 
-                    await Program.UpdateUserStatus(client, "IDLE", "bocchi");
+                    await Task.Delay(10);
+
+                    disconnectionTimer = new Timer(TimerCallback, null, TimeSpan.FromSeconds(15), Timeout.InfiniteTimeSpan);
+                    Console.WriteLine("Timer Started");
                 }
                 else
                 {
                     RemoveDisconnectionTimer();
 
-                    if (SlashComms._queueDictionary[guild][0] != null)
+                    if (SlashComms._queueDictionary.ContainsKey(guild) && SlashComms._queueDictionary[guild].Count > 0)
                     {
-                        var currentTrack = SlashComms._queueDictionary[guild][0];
-                        
-                        Console.WriteLine("PLAYER IS PLAYING");
-                        Console.WriteLine($"NOW PLAYING: {currentTrack.Title}");
-                        await Program.UpdateUserStatus(client, "LISTENING", currentTrack.Title);
+                        if (SlashComms._queueDictionary[guild][0] != null)
+                        {
+                            var currentTrack = SlashComms._queueDictionary[guild][0];
+
+                            if (SlashComms._queueDictionary.Count > 1)
+                            {
+                                Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                            }
+                            else if (SlashComms._queueDictionary.Count == 1)
+                            {
+                                Console.WriteLine("PLAYER IS PLAYING");
+                                Console.WriteLine($"NOW PLAYING: {currentTrack.Title} {currentTrack.Author}");
+                                await Program.UpdateUserStatus(client, "LISTENING", $"{currentTrack.Title} {currentTrack.Author}");
+                            }
+                            else
+                            {
+                                Console.WriteLine("JOINED");
+                                await Program.UpdateUserStatus(client, "IDLE", "bocchi");
+                            }
+                        }
+                        else
+                        {
+                            if (SlashComms._queueDictionary.Count > 1)
+                            {
+                                Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                            }
+                            else
+                            {
+                                Console.WriteLine("JOINED");
+                                await Program.UpdateUserStatus(client, "IDLE", "bocchi");
+                            }
+                        }
                     }
                     else
                     {
-                        Console.WriteLine("JOINED");
+                        if (SlashComms._queueDictionary.Count > 1)
+                        {
+                            Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                        }
+                        else
+                        {
+                            Console.WriteLine("JOINED");
+                            await Program.UpdateUserStatus(client, "IDLE", "bocchi");
+                        }
                     }
                 }
             }
@@ -241,9 +340,8 @@ namespace Alice
 
         private static void TimerCallback(object state)
         {
-            ulong guild = (ulong)state;
 
-            if (SlashComms._queueDictionary.Count == 1)
+            if (SlashComms._queueDictionary.Count == 0)
             {
                 if (lavalinkProcess != null && !lavalinkProcess.HasExited)
                 {
@@ -256,6 +354,7 @@ namespace Alice
             }
 
             RemoveDisconnectionTimer();
+            Console.WriteLine("Timer Ended");
         }
 
         private static void RemoveDisconnectionTimer()
@@ -264,83 +363,6 @@ namespace Alice
             disconnectionTimer?.Dispose();
             disconnectionTimer = null;
         }
-
-        //public static async Task PlaybackFinishedHandler(LavalinkGuildConnection sender, TrackFinishEventArgs e)
-        //{
-        //    Console.WriteLine("SONG ENDED");
-        //    try
-        //    {
-        //        if (skipped == true)
-        //        {
-        //            ulong channelId = 1118545693053829170;
-
-        //            DiscordChannel channel = await discord.GetChannelAsync(channelId);
-
-        //            if (SlashComms.songQueue.Count == 0)
-        //            {
-        //                await channel.SendMessageAsync("The queue list is blank.");
-        //            }
-        //            else
-        //            {
-        //                var queueContent = string.Join("\n", SlashComms.songQueue.Select((track, index) =>
-        //                {
-        //                    var prefix = (index == 0) ? "【Now Playing】 " : string.Empty;
-        //                    Console.WriteLine($"NOW PLAYING: {track.Title}");
-        //                    return $"{index + 1}. {prefix}{track.Title}";
-        //                }));
-        //                await channel.SendMessageAsync($"Status = Skipped\n{queueContent}");
-
-        //            }
-
-        //            return;
-        //        }
-
-        //        if (SlashComms.songQueue.Count > 0)
-        //        {
-        //            if (SlashComms.songQueue.Count == 1)
-        //            {
-        //                SlashComms.songQueue.RemoveAt(0);
-        //            }
-
-        //            var nextTrack = SlashComms.songQueue[1];
-        //            SlashComms.songQueue.RemoveAt(0);
-
-        //            skipped = true;
-        //            Console.WriteLine($"NOW PLAYING: {nextTrack.Title}");
-        //            await sender.PlayAsync(nextTrack);
-        //            skipped = false;
-
-        //            ulong channelId = 1118545693053829170;
-
-        //            DiscordChannel channel = await discord.GetChannelAsync(channelId);
-
-        //            if (SlashComms.songQueue.Count == 0)
-        //            {
-        //                await channel.SendMessageAsync("The queue list is blank.");
-        //            }
-        //            else
-        //            {
-        //                var queueContent = string.Join("\n", SlashComms.songQueue.Select((track, index) =>
-        //                {
-        //                    var prefix = (index == 0) ? "【Now Playing】 " : string.Empty;
-        //                    Console.WriteLine($"NOW PLAYING: {track.Title}");
-        //                    return $"{index + 1}. {prefix}{track.Title}";
-        //                }));
-        //                await channel.SendMessageAsync($"Status = Playback Finished\n{queueContent}");
-        //            }
-        //        }
-
-        //        if (SlashComms.songQueue.Count == 0)
-        //        {
-        //            return;
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Console.WriteLine(ex.ToString());
-        //        Console.WriteLine("SONG ENDED");
-        //    }
-        //}
 
         public static Task PlaybackErrorHandler(LavalinkGuildConnection sender, TrackExceptionEventArgs e)
         {

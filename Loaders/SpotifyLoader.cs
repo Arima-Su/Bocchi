@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using Newtonsoft.Json.Linq;
 using RestSharp;
 
@@ -9,8 +10,18 @@ namespace Alice_Module.Loaders
 {
     internal class SpotifyLoader
     {
-        static string _clientId = "b02e017b87a5498c9357ffe4ff672d01";
-        static string _clientSecret = "e0b39aa43e5e46209741403020d08484";
+        static XDocument xmlDoc = XDocument.Load("data.xml");
+
+        static XElement ID = xmlDoc.Descendants("category")
+                .FirstOrDefault(category => category.Attribute("name")?.Value == "spotID")?
+                .Element("entry");
+
+        static XElement Secret = xmlDoc.Descendants("category")
+                .FirstOrDefault(category => category.Attribute("name")?.Value == "secret")?
+                .Element("entry");
+
+        static string _clientId = ID.Value;
+        static string _clientSecret = Secret.Value;
 
         public SpotifyLoader(string clientId, string clientSecret)
         {
@@ -56,56 +67,6 @@ namespace Alice_Module.Loaders
             }
 
             return songLinks;
-        }
-
-        public static async Task<List<(string Title, string Artist)>> GetPlaylistSongsInfo(string playlistId)
-        {
-            var accessToken = await GetAccessToken();
-
-            var client = new RestClient("https://api.spotify.com");
-            var request = new RestRequest($"/v1/playlists/{playlistId}/tracks", Method.Get);
-            request.AddHeader("Authorization", "Bearer " + accessToken);
-
-            var response = await client.ExecuteAsync(request);
-            var content = response.Content;
-
-            var songsInfo = new List<(string Title, string Artist)>();
-            var items = JObject.Parse(content)["items"];
-            foreach (var item in items)
-            {
-                var track = item["track"];
-                if (track != null)
-                {
-                    var title = track["name"]?.ToString();
-                    var artists = track["artists"] as JArray;
-                    var artist = artists?.FirstOrDefault()?["name"]?.ToString();
-
-                    if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(artist))
-                    {
-                        songsInfo.Add((title, artist));
-                    }
-                }
-            }
-
-            return songsInfo;
-        }
-
-        public static async Task<(string Title, string Artist)> GetSongInfoFromLink(string songLink)
-        {
-            var accessToken = await GetAccessToken();
-
-            var client = new RestClient("https://api.spotify.com");
-            var request = new RestRequest(new Uri(songLink).AbsolutePath, Method.Get);
-            request.AddHeader("Authorization", "Bearer " + accessToken);
-
-            var response = await client.ExecuteAsync(request);
-            var content = response.Content;
-
-            var songInfo = JObject.Parse(content);
-            var title = songInfo["name"].ToString();
-            var artist = songInfo["artists"][0]["name"].ToString();
-
-            return (title, artist);
         }
     }
 }

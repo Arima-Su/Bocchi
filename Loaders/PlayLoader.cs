@@ -218,11 +218,18 @@ namespace Alice_Module.Loaders
                         Program.skipped = true;
                         await conn.PlayAsync(track);
 
-                        await ctx.Channel.SendMessageAsync($"Now Playing: {track.Title}");
+                        await ctx.Channel.SendMessageAsync($"Now Playing: {track.Title} {track.Author}");
                         Console.WriteLine("PLAYER IS PLAYING");
-                        Console.WriteLine($"NOW PLAYING: {track.Title}");
+                        if (SlashComms._queueDictionary.Count > 1)
+                        {
+                            Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
+                        }
                         Program.skipped = false;
-                        await Program.UpdateUserStatus(ctx.Client, "LISTENING", track.Title);
+                        await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
                     }
                     else
                     {
@@ -239,11 +246,18 @@ namespace Alice_Module.Loaders
                         Program.skipped = true;
                         await conn.PlayAsync(track);
 
-                        await ctx.Channel.SendMessageAsync($"Now Playing: {track.Title}");
+                        await ctx.Channel.SendMessageAsync($"Now Playing: {track.Title} {track.Author}");
                         Console.WriteLine("PLAYER IS PLAYING");
-                        Console.WriteLine($"NOW PLAYING: {track.Title}");
+                        if (SlashComms._queueDictionary.Count > 1)
+                        {
+                            Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
+                        }
                         Program.skipped = false;
-                        await Program.UpdateUserStatus(ctx.Client, "LISTENING", track.Title);
+                        await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
                     }
                 }
                 else
@@ -270,7 +284,7 @@ namespace Alice_Module.Loaders
             }
             catch
             {
-                await ctx.Channel.SendMessageAsync($"{track.Title} failed to play");
+                await ctx.Channel.SendMessageAsync($"{track.Title} {track.Author} failed to play");
             }
         }
     }

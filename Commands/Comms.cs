@@ -10,7 +10,12 @@ using System.Threading.Tasks;
 using Alice.Responses;
 using DSharpPlus.Net;
 using Alice_Module.Loaders;
-using Discord;
+using YoutubeExplode;
+using System.Net.Http;
+using System.IO;
+using YoutubeExplode.Videos.Streams;
+using Alice_Module.Handlers;
+using System.Runtime.CompilerServices;
 
 namespace Alice.Commands
 {
@@ -46,7 +51,7 @@ namespace Alice.Commands
                     {
                         SlashComms._invited = true;
                         await node.ConnectAsync(channel);
-                        Console.WriteLine("JOINED");
+                        //Console.WriteLine("JOINED");
                         SlashComms._ready = true;
                         await ctx.Channel.SendMessageAsync("Thanks..");
                     }
@@ -93,7 +98,7 @@ namespace Alice.Commands
                     {
                         SlashComms._invited = false;
                         await node.ConnectAsync(channel);
-                        Console.WriteLine("JOINED");
+                        //Console.WriteLine("JOINED");
                         SlashComms._ready = true;
                     }
                     catch
@@ -179,11 +184,18 @@ namespace Alice.Commands
                     SlashComms._queueDictionary[guild].RemoveAt(1);
                     await conn.PlayAsync(track);
 
-                    await ctx.Channel.SendMessageAsync($"Found it. Now Playing: {track.Title}");
+                    await ctx.Channel.SendMessageAsync($"Found it. Now Playing: {track.Title} {track.Author}");
                     Program.skipped = false;
                     Console.WriteLine("PLAYER IS PLAYING");
-                    Console.WriteLine($"NOW PLAYING: {track.Title}");
-                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", track.Title);
+                    if (SlashComms._queueDictionary.Count > 1)
+                    {
+                        Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
+                    }
+                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
                 }
                 else
                 {
@@ -193,16 +205,25 @@ namespace Alice.Commands
                     SlashComms._queueDictionary[guild].RemoveAt(1);
                     await conn.PlayAsync(track);
 
-                    await ctx.Channel.SendMessageAsync($"Found it. Now Playing: {track.Title}");
+                    await ctx.Channel.SendMessageAsync($"Found it. Now Playing: {track.Title} {track.Author}");
                     Program.skipped = false;
                     Console.WriteLine("PLAYER IS PLAYING");
-                    Console.WriteLine($"NOW PLAYING: {track.Title}");
-                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", track.Title);
+                    if (SlashComms._queueDictionary.Count > 1)
+                    {
+                        Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
+                    }
+                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
                 }
             }
             catch
             {
-                await ctx.Channel.SendMessageAsync($"{track.Title} failed to play");
+                await ctx.Channel.SendMessageAsync($"{track.Title} {track.Author} failed to play");
+                await ctx.Channel.SendMessageAsync("I'm gonna try that again..");
+                await PlayCommand(ctx, search);
             }
         }
 
@@ -236,7 +257,7 @@ namespace Alice.Commands
                     {
                         SlashComms._invited = false;
                         await node.ConnectAsync(channel);
-                        Console.WriteLine("JOINED");
+                        //Console.WriteLine("JOINED");
                         SlashComms._ready = true;
                     }
                     catch
@@ -332,12 +353,19 @@ namespace Alice.Commands
                     Program.skipped = true;
                     await conn.PlayAsync(track);
 
-                    await ctx.Channel.SendMessageAsync($"Now Playing: {track.Title}");
+                    await ctx.Channel.SendMessageAsync($"Now Playing: {track.Title} {track.Author}");
                     Program.skipped = false;
 
                     Console.WriteLine("PLAYER IS PLAYING");
-                    Console.WriteLine($"NOW PLAYING: {track.Title}");
-                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", track.Title);
+                    if (SlashComms._queueDictionary.Count > 1)
+                    {
+                        Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
+                    }
+                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
                 }
                 else
                 {
@@ -352,13 +380,15 @@ namespace Alice.Commands
                             SlashComms._queueDictionary[guild].Add(track);
                         }
 
-                        await ctx.Channel.SendMessageAsync($"Added to Queue: {track.Title}");
+                        await ctx.Channel.SendMessageAsync($"Added to Queue: {track.Title} {track.Author}");
                     }
                 }
             }
             catch
             {
-                await ctx.Channel.SendMessageAsync($"{track.Title} failed to play");
+                await ctx.Channel.SendMessageAsync($"{track.Title} {track.Author} failed to play");
+                await ctx.Channel.SendMessageAsync("I'm gonna try that again..");
+                await PlayCommand(ctx, search);
             }
         }
 
@@ -391,8 +421,8 @@ namespace Alice.Commands
             if (conn.CurrentState.CurrentTrack != null)
             {
                 var currentTrack = conn.CurrentState.CurrentTrack;
-                var trackInfo = $"{currentTrack.Title} {currentTrack.Length}";
-                await ctx.Channel.SendMessageAsync($"Now Playing: {currentTrack.Title} {currentTrack.Length}");
+                var trackInfo = $"{currentTrack.Title} {currentTrack.Author} [{currentTrack.Position}]";
+                await ctx.Channel.SendMessageAsync($"Now Playing: {trackInfo}");
             }
             else
             {
@@ -485,13 +515,24 @@ namespace Alice.Commands
                 await conn.ResumeAsync();
             }
         }
-
+        /*
         [Command("stop")]
         public async Task StopCommand(CommandContext ctx)
         {
             var lava = ctx.Client.GetLavalink();
-            var node = lava.ConnectedNodes.Values.First();
-            var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
+            if (lava != null)
+            {
+                var node = lava.ConnectedNodes.Values.First();
+                if (node != null)
+                {
+                    var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
+                    if (conn != null)
+                    {
+                        await conn.StopAsync();
+                    }
+                }
+            }
+            
             ulong guild = ctx.Guild.Id;
 
             if (SlashComms._lavastarted == false)                                                                    // LAVALINK CHECK
@@ -500,19 +541,25 @@ namespace Alice.Commands
                 return;
             }
 
-            await ctx.Channel.SendMessageAsync("A gun was fired at the player, the queue is in pieces..");
-            Console.WriteLine("LAVALINK IS DISCONNECTED");
-            SlashComms._queueDictionary[guild].Clear();
+            if (SlashComms._queueDictionary.ContainsKey(guild))
+            {
+                SlashComms._queueDictionary.Remove(guild);
+            }
+
+            
 
             if (Program.lavalinkProcess != null && !Program.lavalinkProcess.HasExited)
             {
                 Program.lavalinkProcess.Kill();
                 Program.lavalinkProcess.CloseMainWindow();
                 Program.lavalinkProcess.Close();
-                SlashComms._lavastarted = false;
             }
-        }
 
+            SlashComms._lavastarted = false;
+            await ctx.Channel.SendMessageAsync("A gun was fired at the player, the queue is in pieces..");
+            Console.WriteLine("LAVALINK IS DISCONNECTED");
+        }
+        */
         [Command("queue"), Aliases("q")]
         public async Task QueueCommand(CommandContext ctx)
         {
@@ -533,7 +580,7 @@ namespace Alice.Commands
                 var queueContent = string.Join("\n", SlashComms._queueDictionary[guild].Select((track, index) =>
                 {
                     var prefix = (index == 0) ? "【Now Playing】 " : string.Empty;
-                    return $"{index + 1}. {prefix}{track.Title}";
+                    return $"{index + 1}. {prefix}{track.Title} {track.Author}";
                 }));
                 await ctx.Channel.SendMessageAsync($"Look at all these songs:\n{queueContent}");
             }
@@ -627,7 +674,7 @@ namespace Alice.Commands
                 if (SlashComms._queueDictionary[guild].Count < 2)
                 {
                     var tune = SlashComms._queueDictionary[guild][0];
-                    await ctx.Channel.SendMessageAsync($"Removed {tune.Title}");
+                    await ctx.Channel.SendMessageAsync($"Removed {tune.Title} {tune.Author}");
                     await Program.UpdateUserStatus(ctx.Client, "IDLE", "bocchi");
                     SlashComms._queueDictionary.Remove(guild);
                     await conn.StopAsync();
@@ -642,9 +689,16 @@ namespace Alice.Commands
                 await conn.PlayAsync(nextTrack);
                 SlashComms._queueDictionary[guild].RemoveAt(0);
 
-                await ctx.Channel.SendMessageAsync($"Eliminated {trackTitle}");
-                Console.WriteLine($"NOW PLAYING: {nextTrackTitle}");
-                await Program.UpdateUserStatus(ctx.Client, "LISTENING", track.Title);
+                await ctx.Channel.SendMessageAsync($"Eliminated {trackTitle} {track.Author}");
+                if (SlashComms._queueDictionary.Count > 1)
+                {
+                    Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                }
+                else
+                {
+                    Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
+                }
+                await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
                 Program.skipped = false;
                 return;
             }
@@ -696,9 +750,16 @@ namespace Alice.Commands
             var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
             await conn.PlayAsync(currentTrack);
 
-            await ctx.Channel.SendMessageAsync($"Removed {tracksToRemove.Count} tracks from the queue.. Now Playing {currentTrack.Title}");
-            Console.WriteLine($"NOW PLAYING: {currentTrack.Title}");
-            await Program.UpdateUserStatus(ctx.Client, "LISTENING", currentTrack.Title);
+            await ctx.Channel.SendMessageAsync($"Removed {tracksToRemove.Count} tracks from the queue.. Now Playing {currentTrack.Title} {currentTrack.Author}");
+            if (SlashComms._queueDictionary.Count > 1)
+            {
+                Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+            }
+            else
+            {
+                Console.WriteLine($"NOW PLAYING: {currentTrack.Title} {currentTrack.Author}");
+            }
+            await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{currentTrack.Title} {currentTrack.Author}");
             Program.skipped = false;
         }
 
@@ -749,7 +810,7 @@ namespace Alice.Commands
             if (SlashComms._queueDictionary[guild].Count < 2)
             {
                 var track = SlashComms._queueDictionary[guild][0];
-                await ctx.Channel.SendMessageAsync($"Skipped {track.Title}");
+                await ctx.Channel.SendMessageAsync($"Skipped {track.Title} {track.Author}");
                 await Program.UpdateUserStatus(ctx.Client, "IDLE", "bocchi");
                 SlashComms._queueDictionary.Remove(guild);
                 await conn.StopAsync();
@@ -775,10 +836,17 @@ namespace Alice.Commands
                 await conn.PlayAsync(nextTrack);
                 SlashComms._queueDictionary[guild].RemoveAt(0);
 
-                await ctx.Channel.SendMessageAsync($"Skipped {trackTitle}..");
+                await ctx.Channel.SendMessageAsync($"Skipped {trackTitle} {track.Author}..");
                 Program.skipped = false;
-                Console.WriteLine($"NOW PLAYING: {nextTrackTitle}");
-                await Program.UpdateUserStatus(ctx.Client, "LISTENING", nextTrackTitle);
+                if (SlashComms._queueDictionary.Count > 1)
+                {
+                    Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                }
+                else
+                {
+                    Console.WriteLine($"NOW PLAYING: {nextTrackTitle} {nextTrack.Author}");
+                }
+                await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{nextTrackTitle} {nextTrack.Author}");
             }
             else
             {
@@ -809,6 +877,7 @@ namespace Alice.Commands
                 .AddField("queue", "Shows song queue.")
                 .AddField("resume", "Resumes the current song.")
                 .AddField("pause", "Pauses the current song.")
+                .AddField("loop", "Loops the current song.")
                 .AddField("help", "Displays this list.")
                 .AddField("\u200B", "\u200B")
                 .AddField("Others", "Sometimes specific words can trigger a bocchi response..")
@@ -926,6 +995,12 @@ namespace Alice.Commands
         public async Task LoadCommand(CommandContext ctx, [RemainingText] string list)
         {
 
+            if (SlashComms._lavastarted == false)                                                                    // LAVALINK CHECK
+            {
+                await ctx.Channel.SendMessageAsync("Please execute /start first so I can boot up the music player..");
+                return;
+            }
+
             if (Validates.IsYouTubePlaylistLink(list))
             {
                 var songTitles = new List<string>();
@@ -988,6 +1063,50 @@ namespace Alice.Commands
             }
         }
 
+        [Command("repeat"), Aliases("loop")]
+        public async Task LoopCommand(CommandContext ctx)
+        {
+            ulong guild = ctx.Guild.Id;
+            
+            if(Program.loop.Contains(guild))
+            {
+                Program.loop.Remove(guild);
+                await ctx.Channel.SendMessageAsync("Finally, we can move on..");
+            }
+            else
+            {
+                Program.loop.Add(guild);
+                await ctx.Channel.SendMessageAsync("This song's boutta get stuck in your head..");
+            }
+        }
+
+        [Command("stop")]
+        public async Task StopCommand(CommandContext ctx)
+        {
+            if (SlashComms._lavastarted == false)                                                                    // LAVALINK CHECK
+            {
+                await ctx.Channel.SendMessageAsync("Please execute /start first so I can boot up the music player..");
+                return;
+            }
+
+            ulong guild = ctx.Guild.Id;
+            var lava = ctx.Client.GetLavalink();
+            var node = lava.ConnectedNodes.Values.First();
+            var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
+
+            try
+            {
+                Program.skipped = true;
+                await conn.StopAsync();
+                SlashComms._queueDictionary.Remove(guild);
+                Program.skipped = false;
+            }
+            catch
+            {
+                await ctx.Channel.SendMessageAsync("Stop it? It's already dead..");
+            }
+        }
+
         [Command("debugplayers")]
         public async Task PlayersCommand(CommandContext ctx)
         {
@@ -1001,6 +1120,102 @@ namespace Alice.Commands
             var guild = ctx.Guild.Id;
             SlashComms._queueDictionary.Remove(guild);
             await ctx.Channel.SendMessageAsync($"Queue {guild} reduced to atoms..");
+        }
+
+        [Command("save")]
+        public async Task SaveCommand(CommandContext ctx, [RemainingText] string videoUrl)
+        {
+            if (videoUrl == null)
+            {
+                var re = MessageHandler.GetRandomEntry("Nanis");
+                await ctx.Channel.SendMessageAsync($"{re}.. provide a youtube link please..");
+                return;
+            }
+            else if (Validates.IsYoutubeLink(videoUrl))
+            {
+                await ctx.Channel.SendMessageAsync("Alr, wait a moment..");
+            }
+            else if (Validates.IsSpotifyLink(videoUrl))
+            {
+                await ctx.Channel.SendMessageAsync("That's a spotify link.. provide a youtube link please..");
+                return;
+            }
+            else if (Validates.IsSpotifyPlaylistLink(videoUrl))
+            {
+                await ctx.Channel.SendMessageAsync("That's a spotify playlist link.. provide a youtube link please..");
+                return;
+            }
+            else if (Validates.IsYouTubePlaylistLink(videoUrl))
+            {
+                await ctx.Channel.SendMessageAsync("That's a playlist link.. provide a video link please..");
+                return;
+            }
+            else
+            {
+                var re = MessageHandler.GetRandomEntry("Nanis");
+                await ctx.Channel.SendMessageAsync($"{re}.. provide a youtube link please..");
+                return;
+            }
+
+            var youtube = new YoutubeClient();
+            var streamInfoSet = await youtube.Videos.Streams.GetManifestAsync(videoUrl);
+            var streamInfo = streamInfoSet.GetAudioStreams().GetWithHighestBitrate();
+            string outputFilePath = null;
+            string title;
+            try
+            {
+                if (streamInfo != null)
+                {
+                    using (var audioStream = await youtube.Videos.Streams.GetAsync(streamInfo))
+                    {
+                        using (var memoryStream = new MemoryStream())
+                        {
+                            await audioStream.CopyToAsync(memoryStream);
+                            var audioBytes = memoryStream.ToArray();
+
+                            title = await PlayLoader.GetVideoTitleAsync(videoUrl);
+                            if (title.Contains("<") || title.Contains(">") || title.Contains(@"\") || title.Contains("/") || title.Contains(":") || title.Contains("?") || title.Contains("*") || title.Contains(@"|") || title.Contains("\""))
+                            {
+                                // Define a list of characters to remove
+                                char[] charsToRemove = { '<', '>', '\\', '/', ':', '?', '*', '|', '"' };
+
+                                // Remove each character from the string
+                                foreach (char c in charsToRemove)
+                                {
+                                    title = title.Replace(c.ToString(), "");
+                                }
+                            }
+                            //title = save.ConvertToAsciiCompatible(title);
+
+                            outputFilePath = Path.Combine("songs", $"{title}" + ".mp3");
+                            Console.WriteLine(outputFilePath);
+
+                            File.WriteAllBytes(outputFilePath, audioBytes);
+
+                            if (outputFilePath != null)
+                            {
+                                try
+                                {
+                                    await save.SendAsync(ctx.Channel.Id, outputFilePath, title);
+                                    Console.WriteLine(ctx.Channel.Id);
+                                }
+                                catch (Exception ex)
+                                {
+                                    await ctx.Channel.SendMessageAsync($"Caught First {ex.Message}");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                //await ctx.Channel.SendMessageAsync("Song saved.");
+                
+            }
+            catch(Exception ex)
+            {
+                await ctx.Channel.SendMessageAsync($"Caught Second {ex.Message}");
+            }
+
         }
     }
 }
