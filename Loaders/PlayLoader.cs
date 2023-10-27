@@ -9,6 +9,8 @@ using Alice.Commands;
 using Alice;
 using DSharpPlus.Lavalink;
 using DSharpPlus;
+using System.IO;
+using YoutubeExplode.Videos.Streams;
 
 namespace Alice_Module.Loaders
 {
@@ -26,7 +28,7 @@ namespace Alice_Module.Loaders
             var playlist = await youtubeClient.Playlists.GetAsync(playlistId);
             var playlistVideos = await youtubeClient.Playlists.GetVideosAsync(playlistId);
 
-            List<string> videoUrls = playlistVideos.Select(video => $"https://youtu.be/{video.Id}").ToList();
+            List<string> videoUrls = playlistVideos.Select(video => $"https://www.youtube.com/watch?v={video.Id}").ToList();
             return videoUrls;
         }
 
@@ -63,6 +65,65 @@ namespace Alice_Module.Loaders
             var video = await youtubeClient.Videos.GetAsync(videoId);
             string title = video.Title;
             return title;
+        }
+
+        public static async Task Save(CommandContext ctx, string videoUrl)
+        {
+            var youtube = new YoutubeClient();
+
+            var streamInfoSet = await youtube.Videos.Streams.GetManifestAsync(videoUrl);
+            var streamInfo = streamInfoSet.GetAudioOnlyStreams().GetWithHighestBitrate();
+            string outputFilePath = null;
+            string title;
+            try
+            {
+                if (streamInfo != null)
+                {
+                    using (var audioStream = await youtube.Videos.Streams.GetAsync(streamInfo))
+                    {
+                        using (var memoryStream = new MemoryStream())
+                        {
+                            await audioStream.CopyToAsync(memoryStream);
+                            var audioBytes = memoryStream.ToArray();
+
+                            title = await PlayLoader.GetVideoTitleAsync(videoUrl);
+                            if (title.Contains("<") || title.Contains(">") || title.Contains(@"\") || title.Contains("/") || title.Contains(":") || title.Contains("?") || title.Contains("*") || title.Contains(@"|") || title.Contains("\""))
+                            {
+                                // Define a list of characters to remove
+                                char[] charsToRemove = { '<', '>', '\\', '/', ':', '?', '*', '|', '"' };
+
+                                // Remove each character from the string
+                                foreach (char c in charsToRemove)
+                                {
+                                    title = title.Replace(c.ToString(), "");
+                                }
+                            }
+
+                            outputFilePath = Path.Combine("songs", $"{title}" + ".mp3");
+                            Console.WriteLine(outputFilePath);
+
+                            File.WriteAllBytes(outputFilePath, audioBytes);
+
+                            if (outputFilePath != null)
+                            {
+                                try
+                                {
+                                    //await save.SendAsync(ctx.Channel.Id, outputFilePath, title);
+                                    Console.WriteLine(ctx.Channel.Id);
+                                }
+                                catch (Exception ex)
+                                {
+                                    await ctx.Channel.SendMessageAsync($"I hit a wall, the logs say: {ex.Message}");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                await ctx.Channel.SendMessageAsync($"I hit a wall, the logs say: {ex.Message}");
+            }
         }
 
         public static string ParseVideoId(string playlistLink)

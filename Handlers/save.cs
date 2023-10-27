@@ -34,6 +34,28 @@ namespace Alice_Module.Handlers
             }
         }
 
+        public static async Task SendSilentAsync(ulong channelId, string path)
+        {
+            DiscordSocketClient client = new DiscordSocketClient();
+
+            string token = Program.tokenElement.Value;
+
+            await client.LoginAsync(TokenType.Bot, token);
+            await client.StartAsync();
+
+            try
+            {
+                var channel = await client.GetChannelAsync(channelId) as ITextChannel;
+                await channel.SendFileAsync(path);
+
+                client.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+        }
+
         public static string ConvertToAsciiCompatible(string input)
         {
             // Create a StringBuilder to store the converted characters

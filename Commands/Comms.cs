@@ -1,5 +1,4 @@
-﻿using DSharpPlus;
-using DSharpPlus.CommandsNext;
+﻿using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Entities;
 using DSharpPlus.Lavalink;
@@ -11,11 +10,12 @@ using Alice.Responses;
 using DSharpPlus.Net;
 using Alice_Module.Loaders;
 using YoutubeExplode;
-using System.Net.Http;
 using System.IO;
 using YoutubeExplode.Videos.Streams;
 using Alice_Module.Handlers;
-using System.Runtime.CompilerServices;
+using NAudio.Wave;
+using System.Text;
+using AngleSharp.Text;
 
 namespace Alice.Commands
 {
@@ -421,8 +421,8 @@ namespace Alice.Commands
             if (conn.CurrentState.CurrentTrack != null)
             {
                 var currentTrack = conn.CurrentState.CurrentTrack;
-                var trackInfo = $"{currentTrack.Title} {currentTrack.Author} [{currentTrack.Position}]";
-                await ctx.Channel.SendMessageAsync($"Now Playing: {trackInfo}");
+                var trackInfo = $"{currentTrack.Title} {currentTrack.Author} [{currentTrack.Length}]";
+                await ctx.Channel.SendMessageAsync($"***Now Playing: {trackInfo}***");
             }
             else
             {
@@ -561,7 +561,7 @@ namespace Alice.Commands
         }
         */
         [Command("queue"), Aliases("q")]
-        public async Task QueueCommand(CommandContext ctx)
+        public async Task QueueCommand(CommandContext ctx, [RemainingText] string page)
         {
             ulong guild = ctx.Guild.Id;
             
@@ -571,18 +571,181 @@ namespace Alice.Commands
                 return;
             }
 
-            if (SlashComms._queueDictionary[guild].Count == 0)
+            if (SlashComms._queueDictionary[guild].Count > 0 && SlashComms._queueDictionary[guild] != null)
             {
-                await ctx.Channel.SendMessageAsync("The queue list is blank.");
+                int swipe;
+                
+                if (SlashComms._queueDictionary[guild].Count > 20)
+                {
+                    if(page is null)
+                    {
+                        swipe = 1;
+                    }
+                    else
+                    {
+                        swipe = page.ToInteger(0);
+                    }
+
+                    var message = new StringBuilder();
+                    TimeSpan queueLength = TimeSpan.Zero;
+                    int trackNumber = 1;
+
+                    if (swipe <= 0)
+                    {
+                        swipe = 1;
+                    }
+
+                    if (swipe * 20 > SlashComms._queueDictionary[guild].Count+19)
+                    {
+                        await ctx.Channel.SendMessageAsync("The queue list isn't *that* long, I'll just give you the last page..");
+                        if (SlashComms._queueDictionary[guild].Count%20 != 0)
+                        {
+                            swipe = (SlashComms._queueDictionary[guild].Count / 20) + 1;
+                        }
+                        else
+                        {
+                            swipe = (SlashComms._queueDictionary[guild].Count / 20);
+                        }
+
+                    }
+
+                    await ctx.Channel.SendMessageAsync("Look at all these songs: [Page: " + swipe + "]");
+
+                    foreach (var track in SlashComms._queueDictionary[guild])
+                    {
+                        if (track != null)
+                        {
+                            if (trackNumber >= (swipe - 1) * 20 && trackNumber <= swipe * 20)
+                            {
+                                // Append the track information to the message
+                                if (trackNumber == 1)
+                                {
+                                    message.AppendLine($"***Now Playing: {track.Title} {track.Author}***");
+                                }
+                                else
+                                {
+                                    message.AppendLine($"{trackNumber}. {track.Title} {track.Author}");
+                                }
+                            }
+
+                            queueLength += track.Length;
+                            trackNumber++;
+                        }
+                    }
+
+                    if (trackNumber > 1)
+                    {
+                        message.AppendLine($"***{trackNumber - 1} total songs for {queueLength} long..***");
+                        await ctx.Channel.SendMessageAsync(message.ToString());
+                    }
+                    else
+                    {
+                        await ctx.Channel.SendMessageAsync("The queue is empty.");
+                    }
+                }
+                else
+                {
+                    if (page is null == false)
+                    {
+                        await ctx.Channel.SendMessageAsync("That page number is unnecessary, the queue isn't *that* long..");
+                        await ctx.Channel.SendMessageAsync("Anywho..");
+                    }
+
+                    var message = new StringBuilder();
+                    TimeSpan queueLength = TimeSpan.Zero;
+                    int trackNumber = 1;
+
+                    await ctx.Channel.SendMessageAsync("Look at all these songs: ");
+
+                    foreach (var track in SlashComms._queueDictionary[guild])
+                    {
+                        if (track != null)
+                        {
+                            // Append the track information to the message
+                            if (trackNumber == 1)
+                            {
+                                message.AppendLine($"***Now Playing: {track.Title} {track.Author}***");
+                            }
+                            else
+                            {
+                                message.AppendLine($"{trackNumber}. {track.Title} {track.Author}");
+                            }
+
+                            queueLength += track.Length;
+                            trackNumber++;
+                        }
+                    }
+
+                    if (trackNumber > 1)
+                    {
+                        message.AppendLine($"***{trackNumber - 1} total songs for {queueLength} long..***");
+                        await ctx.Channel.SendMessageAsync(message.ToString());
+                    }
+                    else
+                    {
+                        await ctx.Channel.SendMessageAsync("The queue is empty.");
+                    }
+                }
+
+                //var queueContent = string.Join("\n", SlashComms._queueDictionary[guild].Select((track, index) =>
+                //{
+                //    var prefix = (index == 0) ? "【Now Playing】 " : string.Empty;
+                //    return $"{index + 1}. {prefix}{track.Title} {track.Author}";
+                //}));
+                //await ctx.Channel.SendMessageAsync($"Look at all these songs:\n{queueContent}");
+
+                //var message = new StringBuilder();
+                //TimeSpan queueLength = TimeSpan.Zero;
+                //int trackNumber = 1;
+                //int segmenter = 1;
+
+                //await ctx.Channel.SendMessageAsync("Look at all these songs: ");
+
+                //foreach (var track in SlashComms._queueDictionary[guild])
+                //{
+                //    if (track != null)
+                //    {
+                //        // Append the track information to the message
+                //        if (trackNumber == 1)
+                //        {
+                //            message.AppendLine($"***Now Playing: {track.Title} {track.Author}***");
+                //        }
+                //        else
+                //        {
+                //            message.AppendLine($"{trackNumber}. {track.Title} {track.Author}");
+                //        }
+
+                //        if (segmenter == 30)
+                //        {
+                //            await ctx.Channel.SendMessageAsync(message.ToString());
+                //            segmenter = 0;
+
+                //            message.Clear();
+
+                //            await Task.Delay(5000);
+                //        }
+
+                //        queueLength += track.Length;
+                //        segmenter++;
+                //        trackNumber++;
+                //    }
+                //}
+
+                //if (trackNumber > 1)
+                //{
+                //    await ctx.Channel.SendMessageAsync(message.ToString());
+                //    await ctx.Channel.SendMessageAsync($"***{trackNumber - 1} total songs for {queueLength} long..***");
+                //}
+                //else
+                //{
+                //    await ctx.Channel.SendMessageAsync("The queue is empty.");
+                //}
+
+
             }
             else
             {
-                var queueContent = string.Join("\n", SlashComms._queueDictionary[guild].Select((track, index) =>
-                {
-                    var prefix = (index == 0) ? "【Now Playing】 " : string.Empty;
-                    return $"{index + 1}. {prefix}{track.Title} {track.Author}";
-                }));
-                await ctx.Channel.SendMessageAsync($"Look at all these songs:\n{queueContent}");
+                await ctx.Channel.SendMessageAsync("The queue list is blank.");
             }
         }
 
@@ -750,7 +913,8 @@ namespace Alice.Commands
             var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
             await conn.PlayAsync(currentTrack);
 
-            await ctx.Channel.SendMessageAsync($"Removed {tracksToRemove.Count} tracks from the queue.. Now Playing {currentTrack.Title} {currentTrack.Author}");
+            await ctx.Channel.SendMessageAsync($"Removed {tracksToRemove.Count} tracks from the queue..");
+            await ctx.Channel.SendMessageAsync($"Now Playing: {currentTrack.Title} {currentTrack.Author}");
             if (SlashComms._queueDictionary.Count > 1)
             {
                 Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
@@ -806,6 +970,12 @@ namespace Alice.Commands
             var node = lava.ConnectedNodes.Values.First();
             var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
 
+            if (SlashComms._queueDictionary[guild] == null)
+            {
+                await ctx.Channel.SendMessageAsync("Buddy, there's no song to skip to..");
+                return;
+            }
+
             // Check if there are tracks in the queue
             if (SlashComms._queueDictionary[guild].Count < 2)
             {
@@ -850,7 +1020,32 @@ namespace Alice.Commands
             }
             else
             {
-                await ctx.Channel.SendMessageAsync("Buddy, there's no song to skip to..");
+                try
+                {
+                    var nextTrack = SlashComms._queueDictionary[guild][1];
+                    var nextTrackTitle = nextTrack.Title;
+                    var track = SlashComms._queueDictionary[guild][0];
+                    var trackTitle = track.Title;
+                    Program.skipped = true;
+                    await conn.PlayAsync(nextTrack);
+                    SlashComms._queueDictionary[guild].RemoveAt(0);
+
+                    await ctx.Channel.SendMessageAsync($"Skipped {trackTitle} {track.Author}..");
+                    Program.skipped = false;
+                    if (SlashComms._queueDictionary.Count > 1)
+                    {
+                        Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"NOW PLAYING: {nextTrackTitle} {nextTrack.Author}");
+                    }
+                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{nextTrackTitle} {nextTrack.Author}");
+                }
+                catch
+                {
+                    await ctx.Channel.SendMessageAsync("I tried, but there really is no song to skip to..");
+                }
             }
         }
 
@@ -1001,6 +1196,13 @@ namespace Alice.Commands
                 return;
             }
 
+            if (ctx.Member.VoiceState == null)
+            {
+                var re = MessageHandler.GetRandomEntry("Nanis");
+                await ctx.Channel.SendMessageAsync($"{re} get into a voice channel first..");
+                return;
+            }
+
             if (Validates.IsYouTubePlaylistLink(list))
             {
                 var songTitles = new List<string>();
@@ -1013,18 +1215,32 @@ namespace Alice.Commands
                 }
 
                 await ctx.Channel.SendMessageAsync("Loading Playlist..");
+                var progressMessage = await ctx.Channel.SendMessageAsync("_ songs queue'd..");
+                int songCount = 0;
+
                 foreach (string title in songTitles)
                 {
+                    Program.unbroken = true;
+
                     if (PlayLoader._queuefull == true)
                     {
                         PlayLoader._queuefull = false;
                         break;
                     }
 
+                    if (Program.forcestop == true)
+                    {
+                        Program.unbroken = false;
+                        break;
+                    }
+
+                    ++songCount;
+
                     await PlayLoader.Enqueue(ctx, title);
+                    await progressMessage.ModifyAsync($"{songCount} songs queue'd..");
                 }
 
-                await ctx.Channel.SendMessageAsync("Playlist loaded.");
+                await progressMessage.ModifyAsync("Playlist loaded.");
                 return;
             }
             else if (Validates.IsSpotifyPlaylistLink(list))
@@ -1041,16 +1257,29 @@ namespace Alice.Commands
                 }
 
                 await ctx.Channel.SendMessageAsync("Loading Playlist..");
+                var progressMessage = await ctx.Channel.SendMessageAsync("_ songs queue'd..");
+                int songCount = 0;
+
                 foreach (var link in songslinks)
                 {
-                    
+                    Program.unbroken = true;
+
                     if (PlayLoader._queuefull == true)
                     {
                         PlayLoader._queuefull = false;
                         break;
                     }
 
+                    if (Program.forcestop == true)
+                    {
+                        Program.unbroken = false;
+                        break;
+                    }
+
+                    ++songCount;
+
                     await PlayLoader.Enqueue(ctx, link);
+                    await progressMessage.ModifyAsync($"{songCount} songs queue'd..");
                 }
 
                 await ctx.Channel.SendMessageAsync("Playlist loaded.");
@@ -1099,6 +1328,7 @@ namespace Alice.Commands
                 Program.skipped = true;
                 await conn.StopAsync();
                 SlashComms._queueDictionary.Remove(guild);
+                await ctx.Channel.SendMessageAsync("Bam, dead.");
                 Program.skipped = false;
             }
             catch
@@ -1122,6 +1352,30 @@ namespace Alice.Commands
             await ctx.Channel.SendMessageAsync($"Queue {guild} reduced to atoms..");
         }
 
+        [Command("forcestop")]
+        public async Task ForceStop(CommandContext ctx)
+        {
+            Program.forcestop = true;
+
+            try
+            {
+                var msg = await ctx.Channel.SendMessageAsync("Stopping..");
+
+                while (Program.unbroken == true)
+                {
+                    await Task.Delay(10);
+                }
+
+                await msg.ModifyAsync("Stopped.");
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            Program.forcestop = false;
+        }
+
         [Command("save")]
         public async Task SaveCommand(CommandContext ctx, [RemainingText] string videoUrl)
         {
@@ -1129,6 +1383,40 @@ namespace Alice.Commands
             {
                 var re = MessageHandler.GetRandomEntry("Nanis");
                 await ctx.Channel.SendMessageAsync($"{re}.. provide a youtube link please..");
+                return;
+            }
+            else if (Validates.IsYouTubePlaylistLink(videoUrl))
+            {
+                var songTitles = new List<string>();
+                songTitles = await PlayLoader.YoutubeLoaderAsync(videoUrl);
+
+                if (songTitles == null || songTitles.Count == 0)
+                {
+                    await ctx.Channel.SendMessageAsync("No song titles found in the playlist.");
+                    return;
+                }
+
+                await ctx.Channel.SendMessageAsync("Saving Playlist..");
+                var progressMessage = await ctx.Channel.SendMessageAsync("_ songs saved..");
+                int songCount = 0;
+
+                foreach (string deets in songTitles)
+                {
+                    Program.unbroken = true;
+                    
+                    if (Program.forcestop == true)
+                    {
+                        Program.unbroken = false;
+                        break;
+                    }
+
+                    ++songCount;
+
+                    await PlayLoader.Save(ctx, deets);
+                    await progressMessage.ModifyAsync($"{songCount} songs saved..");
+                }
+
+                await ctx.Channel.SendMessageAsync("Playlist saved.");
                 return;
             }
             else if (Validates.IsYoutubeLink(videoUrl))
@@ -1145,11 +1433,6 @@ namespace Alice.Commands
                 await ctx.Channel.SendMessageAsync("That's a spotify playlist link.. provide a youtube link please..");
                 return;
             }
-            else if (Validates.IsYouTubePlaylistLink(videoUrl))
-            {
-                await ctx.Channel.SendMessageAsync("That's a playlist link.. provide a video link please..");
-                return;
-            }
             else
             {
                 var re = MessageHandler.GetRandomEntry("Nanis");
@@ -1158,8 +1441,9 @@ namespace Alice.Commands
             }
 
             var youtube = new YoutubeClient();
+
             var streamInfoSet = await youtube.Videos.Streams.GetManifestAsync(videoUrl);
-            var streamInfo = streamInfoSet.GetAudioStreams().GetWithHighestBitrate();
+            var streamInfo = streamInfoSet.GetAudioOnlyStreams().GetWithHighestBitrate();
             string outputFilePath = null;
             string title;
             try
@@ -1185,7 +1469,6 @@ namespace Alice.Commands
                                     title = title.Replace(c.ToString(), "");
                                 }
                             }
-                            //title = save.ConvertToAsciiCompatible(title);
 
                             outputFilePath = Path.Combine("songs", $"{title}" + ".mp3");
                             Console.WriteLine(outputFilePath);
@@ -1201,21 +1484,17 @@ namespace Alice.Commands
                                 }
                                 catch (Exception ex)
                                 {
-                                    await ctx.Channel.SendMessageAsync($"Caught First {ex.Message}");
+                                    await ctx.Channel.SendMessageAsync($"I hit a wall, the logs say: {ex.Message}");
                                 }
                             }
                         }
                     }
-                }
-
-                //await ctx.Channel.SendMessageAsync("Song saved.");
-                
+                }  
             }
             catch(Exception ex)
             {
-                await ctx.Channel.SendMessageAsync($"Caught Second {ex.Message}");
+                await ctx.Channel.SendMessageAsync($"I hit a wall, the logs say: {ex.Message}");
             }
-
         }
     }
 }

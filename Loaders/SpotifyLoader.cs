@@ -54,7 +54,6 @@ namespace Alice_Module.Loaders
             var response = await client.ExecuteAsync(request);
             var content = response.Content;
 
-            // Parse the response content to get the song links
             var songLinks = new List<string>();
             var items = JObject.Parse(content)["items"];
             foreach (var item in items)

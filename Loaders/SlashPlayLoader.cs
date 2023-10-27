@@ -26,20 +26,31 @@ namespace Alice_Module.Loaders
             var playlist = await youtubeClient.Playlists.GetAsync(playlistId);
             var playlistVideos = await youtubeClient.Playlists.GetVideosAsync(playlistId);
 
-            List<string> songTitles = playlistVideos.Select(video => video.Title).ToList();
-            return songTitles;
+            List<string> videoUrls = playlistVideos.Select(video => $"https://www.youtube.com/watch?v={video.Id}").ToList();
+            return videoUrls;
         }
 
         static string ExtractPlaylistId(string playlistLink)
         {
-
             const string playlistParam = "list=";
             int index = playlistLink.IndexOf(playlistParam);
 
             if (index != -1)
             {
                 index += playlistParam.Length;
-                return playlistLink.Substring(index);
+
+                // Check if there are any additional parameters after the playlist ID
+                int nextAmpersand = playlistLink.IndexOf('&', index);
+                if (nextAmpersand != -1)
+                {
+                    // If there are additional parameters, extract the playlist ID up to the next ampersand
+                    return playlistLink.Substring(index, nextAmpersand - index);
+                }
+                else
+                {
+                    // If there are no additional parameters, extract the playlist ID until the end of the URL
+                    return playlistLink.Substring(index);
+                }
             }
 
             throw new ArgumentException("Invalid YouTube playlist link");

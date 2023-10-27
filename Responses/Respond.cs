@@ -10,6 +10,8 @@ using System.Linq;
 using Alice.Commands;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using Alice_Module.Handlers;
+using ImageMagick;
 
 namespace Alice.Responses
 {
@@ -19,24 +21,64 @@ namespace Alice.Responses
         {
             var xmlFilePath = "data.xml";
             
-            if (File.Exists(xmlFilePath))
+            if (Program.username.Value == "Bocchi")
             {
-                XDocument xmlDoc = XDocument.Load(xmlFilePath);
-
-                var entries = xmlDoc.Descendants("category")
-                                    .FirstOrDefault(e => e.Attribute("name")?.Value == category)
-                                    ?.Elements("entry")
-                                    .Select(e => e.Value)
-                                    .ToList();
-
-                if (entries != null && entries.Count > 0)
+                if (File.Exists(xmlFilePath))
                 {
-                    Random random = new Random();
-                    int randomIndex = random.Next(0, entries.Count);
-                    return entries[randomIndex];
+                    XDocument xmlDoc = XDocument.Load(xmlFilePath);
+
+                    var entries = xmlDoc.Descendants("category")
+                                        .FirstOrDefault(e => e.Attribute("name")?.Value == category)
+                                        ?.Elements("entry")
+                                        .Select(e => e.Value)
+                                        .ToList();
+
+                    if (entries != null && entries.Count > 0)
+                    {
+                        Random random = new Random();
+                        int randomIndex = random.Next(0, entries.Count);
+                        return entries[randomIndex];
+                    }
                 }
             }
+            if (Program.username.Value == "Cirno")
+            {
+                if (File.Exists(xmlFilePath))
+                {
+                    XDocument xmlDoc = XDocument.Load(xmlFilePath);
 
+                    if (category == "Happy_Reacts" || category == "Sad_Reacts" || category == "Celebrative_Reacts")
+                    {
+                        var entries = xmlDoc.Descendants("category")
+                                        .FirstOrDefault(e => e.Attribute("name")?.Value == $"Cirno_{category}")
+                                        ?.Elements("entry")
+                                        .Select(e => e.Value)
+                                        .ToList();
+
+                        if (entries != null && entries.Count > 0)
+                        {
+                            Random random = new Random();
+                            int randomIndex = random.Next(0, entries.Count);
+                            return entries[randomIndex];
+                        }
+                    }
+                    else
+                    {
+                        var entries = xmlDoc.Descendants("category")
+                                        .FirstOrDefault(e => e.Attribute("name")?.Value == category)
+                                        ?.Elements("entry")
+                                        .Select(e => e.Value)
+                                        .ToList();
+
+                        if (entries != null && entries.Count > 0)
+                        {
+                            Random random = new Random();
+                            int randomIndex = random.Next(0, entries.Count);
+                            return entries[randomIndex];
+                        }
+                    }
+                }
+            }
             return null;
         }
 
@@ -193,9 +235,9 @@ namespace Alice.Responses
 
             // BOCCHI RESPONSES
 
-            if (e.Message.Content.Contains("Bocchi", StringComparison.OrdinalIgnoreCase) || e.Message.Content.Contains("Bocchi's", StringComparison.OrdinalIgnoreCase))
+            if (e.Message.Content.Contains(Program.username.Value, StringComparison.OrdinalIgnoreCase) || e.Message.Content.Contains($"{Program.username.Value}'s", StringComparison.OrdinalIgnoreCase))
             {
-                string keyword = "Bocchi";
+                string keyword = Program.username.Value;
                 string messageContent = e.Message.Content;
 
                 int keywordIndex = messageContent.IndexOf(keyword, StringComparison.OrdinalIgnoreCase);
@@ -345,7 +387,7 @@ namespace Alice.Responses
                     }
                 }
 
-                if (e.Message.Content.Trim().Equals("bocchi", StringComparison.OrdinalIgnoreCase) || e.Message.Content.Trim().Equals("bocchi?", StringComparison.OrdinalIgnoreCase) || e.Message.Content.Trim().Equals("bocchi.", StringComparison.OrdinalIgnoreCase))
+                if (e.Message.Content.Trim().Equals(Program.username.Value, StringComparison.OrdinalIgnoreCase) || e.Message.Content.Trim().Equals($"{Program.username.Value}?", StringComparison.OrdinalIgnoreCase) || e.Message.Content.Trim().Equals($"{Program.username.Value}.", StringComparison.OrdinalIgnoreCase))
                 {
                     string What = GetRandomEntry("Nanis");
 
@@ -356,106 +398,12 @@ namespace Alice.Responses
                 }
             }
 
-            //if (e.Message.Content.Contains("Surprise me", StringComparison.OrdinalIgnoreCase))
-            //{
-            //    ulong desiredChannelId = 747480792124620936;
-
-            //    if (e.Message.Channel.Id == desiredChannelId)
-            //    {
-            //        // Get the guild from the message author
-            //        SocketGuild guild = (message.Author as SocketGuildUser)?.Guild;
-
-            //        SocketGuildUser AbUser = message.Author as SocketGuildUser;
-
-            //        ITextChannel textChannel = e.Message.Channel as ITextChannel;
-
-            //        if (AbUser.VoiceChannel != null)
-            //        {
-            //            // Find the user named "Bocchi" in the guild
-            //            SocketGuildUser bocchiUser = guild?.Users.FirstOrDefault(user => user.Username == "Bocchi");
-            //            if (bocchiUser != null && bocchiUser.VoiceChannel != null)
-            //            {
-
-            //                string webhookUrl = "https://discord.com/api/webhooks/971744013264777246/JtD_TzMdCDW7ZE5uHLDU_YgHYUCNsli17ZR6HA8epLYT0MI23RYYAzPJPg0NwFaNZChG";
-
-            //                Task.Delay(TimeSpan.FromSeconds(1)).Wait();
-            //                e.Message.Channel.SendMessageAsync("Uhh.. I don't know how..");
-            //                Task.Delay(TimeSpan.FromSeconds(2)).Wait();
-            //                // First message
-            //                string content1 = "Wait, I got this..";
-            //                string payload1 = $"{{\"content\": \"{content1}\"}}";
-            //                using (HttpClient httpClient = new HttpClient())
-            //                {
-            //                    HttpContent httpContent1 = new StringContent(payload1, Encoding.UTF8, "application/json");
-            //                    httpClient.PostAsync(webhookUrl, httpContent1).Wait();
-            //                }
-
-            //                Task.Delay(TimeSpan.FromSeconds(2)).Wait();
-            //                // Read the contents of the file into an array of strings
-            //                string[] lines = File.ReadAllLines("Surprises.txt");
-
-            //                // Choose a random entry from the array
-            //                Random random = new Random();
-            //                string song = lines[random.Next(lines.Length)];
-
-            //                // Second message
-            //                string content2 = $"bocchi!AlicePlay {song}";
-            //                string payload2 = $"{{\"content\": \"{content2}\"}}";
-            //                using (HttpClient httpClient = new HttpClient())
-            //                {
-            //                    HttpContent httpContent2 = new StringContent(payload2, Encoding.UTF8, "application/json");
-            //                    httpClient.PostAsync(webhookUrl, httpContent2).Wait();
-            //                }
-            //            }
-            //            else
-            //            {
-            //                Task.Delay(TimeSpan.FromSeconds(1)).Wait();
-            //                string webhookUrl = "https://discord.com/api/webhooks/971744013264777246/JtD_TzMdCDW7ZE5uHLDU_YgHYUCNsli17ZR6HA8epLYT0MI23RYYAzPJPg0NwFaNZChG";
-            //                string content3 = "C'mon guys, atleast let her in a voice channel first..";
-            //                string payload3 = $"{{\"content\": \"{content3}\"}}";
-            //                using (HttpClient httpClient = new HttpClient())
-            //                {
-            //                    HttpContent httpContent3 = new StringContent(payload3, Encoding.UTF8, "application/json");
-            //                    httpClient.PostAsync(webhookUrl, httpContent3).Wait();
-            //                }
-
-            //                Task.Delay(TimeSpan.FromSeconds(2)).Wait();
-
-            //                string content4 = "Come in, Bocchi..";
-            //                string payload4 = $"{{\"content\": \"{content4}\"}}";
-            //                using (HttpClient httpClient = new HttpClient())
-            //                {
-            //                    HttpContent httpContent4 = new StringContent(payload4, Encoding.UTF8, "application/json");
-            //                    httpClient.PostAsync(webhookUrl, httpContent4).Wait();
-            //                }
-
-
-            //                LavaLinkAudio.JoinAliceAsync(guild, AbUser as IVoiceState, textChannel);
-            //                Task.Delay(TimeSpan.FromSeconds(1)).Wait();
-            //                e.Message.Channel.SendMessageAsync("Thanks Alice..");
-            //            }
-            //        }
-            //        else
-            //        {
-            //            string webhookUrl = "https://discord.com/api/webhooks/971744013264777246/JtD_TzMdCDW7ZE5uHLDU_YgHYUCNsli17ZR6HA8epLYT0MI23RYYAzPJPg0NwFaNZChG";
-            //            string content3 = "You guys know that's not how it works, you gotta be the first one to be in the voice channel..";
-            //            string payload3 = $"{{\"content\": \"{content3}\"}}";
-            //            using (HttpClient httpClient = new HttpClient())
-            //            {
-            //                HttpContent httpContent3 = new StringContent(payload3, Encoding.UTF8, "application/json");
-            //                httpClient.PostAsync(webhookUrl, httpContent3).Wait();
-            //            }
-            //        }
-            //    }
-            //    else
-            //    {
-            //        e.Message.Channel.SendMessageAsync("Uhh.. I don't know how and unfortunately Alice likes to stay at the canteen..");
-            //    }
-            //}
-
             if (e.Message.Content.Contains("Alice", StringComparison.OrdinalIgnoreCase))
             {
-                ulong desiredChannelId = 747480792124620936;
+
+                ulong desiredChannelId = ulong.Parse(Program.doc.Descendants("category")
+                .FirstOrDefault(category => category.Attribute("name")?.Value == "channel")?
+                .Element("entry").Value);
 
                 if (e.Message.Channel.Id == desiredChannelId)
                 {
@@ -541,14 +489,112 @@ namespace Alice.Responses
 
             if (e.Message.Content.Contains("So cool", StringComparison.OrdinalIgnoreCase))
             {
-                await e.Message.Channel.SendMessageAsync("https://i.imgur.com/kNh7Qlo.png");
+                string input = e.Message.Content;
+                string target = "so cool";
+
+                int index = input.IndexOf(target, StringComparison.OrdinalIgnoreCase);
+                string extractedText = input.Substring(0, index).Trim();
+
+                if (!e.Message.Content.Contains("Pipebomb", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (Program.username.Value == "Bocchi")
+                    {
+                        try
+                        {
+                            if (index != -1)
+                            {
+                                var file = Path.Combine("assets", "bocchinn.png");
+                                string cooledfile;
+
+                                using (var image = new MagickImage(file))
+                                {
+                                    // Create drawables for text
+                                    var drawable = new Drawables()
+                                        .Font("unispace.ttf", FontStyleType.Normal, FontWeight.Normal, FontStretch.Normal)
+                                        .FontPointSize(46)             // Set font size
+                                        .FillColor(MagickColors.Gold) // Set text color
+                                        .Text(340, 746, extractedText); // Specify text and position
+
+                                    // Annotate the image with the text
+                                    image.Draw(drawable);
+
+                                    cooledfile = Path.Combine("assets", "bocchinn_cooled.png");
+                                    image.Write(cooledfile);
+                                }
+
+                                await save.SendSilentAsync(e.Channel.Id, cooledfile);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            await e.Message.Channel.SendMessageAsync("https://i.imgur.com/kNh7Qlo.png");
+                            Console.WriteLine(ex.Message);
+                        }
+                    }
+
+                    if (Program.username.Value == "Cirno")
+                    {
+                        try
+                        {
+                            if (index != -1)
+                            {
+                                var file = Path.Combine("assets", "chirumiru.png");
+                                string cooledfile;
+
+                                using (var image = new MagickImage(file))
+                                {
+                                    // Create drawables for text
+                                    var drawable = new Drawables()
+                                        .Font("unispace.ttf", FontStyleType.Normal, FontWeight.Normal, FontStretch.Normal)
+                                        .FontPointSize(46)             // Set font size
+                                        .FillColor(MagickColors.Gold) // Set text color
+                                        .Text(370, 766, extractedText); // Specify text and position
+
+                                    // Annotate the image with the text
+                                    image.Draw(drawable);
+
+                                    cooledfile = Path.Combine("assets", "chirumiru_cooled.png");
+                                    image.Write(cooledfile);
+                                }
+
+                                await save.SendSilentAsync(e.Channel.Id, cooledfile);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            await e.Message.Channel.SendMessageAsync("https://i.imgur.com/kNh7Qlo.png");
+                            Console.WriteLine(ex.Message);
+                        }
+                    }
+                }
             }
 
             if (e.Message.Content.Contains("Pipebomb", StringComparison.OrdinalIgnoreCase))
             {
-                await e.Message.Channel.SendMessageAsync("https://i.imgur.com/2aeyQ8D.png");
+                if (Program.username.Value == "Cirno")
+                {
+                    //await e.Message.Channel.SendMessageAsync("https://i.imgur.com/LKUiUMJ.jpg");
+                    await e.Message.Channel.SendMessageAsync("https://i.imgur.com/KQBtTDN.png");
+                }
+
+                if (Program.username.Value == "Bocchi")
+                {
+                    //await e.Message.Channel.SendMessageAsync("https://i.imgur.com/2aeyQ8D.png");
+                    await e.Message.Channel.SendMessageAsync("https://i.imgur.com/VSGi4up.png");
+                }
             }
 
+            if (e.Message.Content.Contains("Happy Cirno Day", StringComparison.OrdinalIgnoreCase))
+            {
+                if (Program.username.Value == "Cirno")
+                {
+                    await e.Message.Channel.SendMessageAsync("https://i.imgur.com/tGnKz8S.jpg");
+                }
+                else
+                {
+                    return;
+                }
+            }
             return;
         }
     }

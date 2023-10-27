@@ -495,15 +495,19 @@ namespace Alice.Commands
         {
             try
             {
-
-                string serverIp = "25.45.15.165";
-                int serverPort = 25575;
+                string serverIp = Program.doc.Descendants("category")
+                .FirstOrDefault(category => category.Attribute("name")?.Value == "sIP")?
+                .Element("entry").Value;
+                
+                int serverPort = int.Parse(Program.doc.Descendants("category")
+                .FirstOrDefault(category => category.Attribute("name")?.Value == "sPort")?
+                .Element("entry").Value);
 
                 var rclient = RconClient.Create($"{serverIp}", serverPort);
 
                 await rclient.ConnectAsync();
 
-                var authenticated = await rclient.AuthenticateAsync("727");
+                var authenticated = await rclient.AuthenticateAsync("727");      //FOR CLEANUP
                 if (authenticated)
                 {
                     await rclient.ExecuteCommandAsync($"{message}");

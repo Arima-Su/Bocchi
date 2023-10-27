@@ -15,8 +15,6 @@ using Alice.Responses;
 using System.Xml.Linq;
 using System.Diagnostics;
 using System.Threading;
-using AngleSharp.Media.Dom;
-using System.Reflection;
 using System.Collections.Generic;
 
 namespace Alice
@@ -30,9 +28,13 @@ namespace Alice
         public static Process lavalinkProcess;
         public static CommandsNextConfiguration commandsConfig;
         public static DiscordClient discord;
-        static XDocument doc = XDocument.Load("data.xml");
+        public static XDocument doc = XDocument.Load("data.xml");
         private static Timer disconnectionTimer;
         public static XElement tokenElement;
+        public static XElement username;
+        public static string User, Token, Prefix;
+        public static bool forcestop = false;
+        public static bool unbroken = false;
 
         static async Task Main(string[] args)
         {
@@ -45,15 +47,36 @@ namespace Alice
 
             var logFactory = new LoggerFactory().AddSerilog();
 
-            
+            DateTime targetDate = new DateTime(DateTime.Now.Year, 9, 9);
+
+            DateTime currentDate = DateTime.Now;
+
+            if (currentDate.Date == targetDate.Date)
+            {
+                // CIRNO DAY
+                Token = "cirno_token";
+                Prefix = "cirno_prefix";
+                User = "cirno_user";
+            }
+            else
+            {
+                Token = "token";
+                Prefix = "prefix";
+                User = "username";
+            }
+
+
             tokenElement = doc.Descendants("category")
-                .FirstOrDefault(category => category.Attribute("name")?.Value == "token")?
+                .FirstOrDefault(category => category.Attribute("name")?.Value == Token)?
                 .Element("entry");
             XElement prefixElement = doc.Descendants("category")
-                .FirstOrDefault(category => category.Attribute("name")?.Value == "prefix")?
+                .FirstOrDefault(category => category.Attribute("name")?.Value == Prefix)?
                 .Element("entry");
             XElement weebhook = doc.Descendants("category")
                 .FirstOrDefault(category => category.Attribute("name")?.Value == "hook")?
+                .Element("entry");
+            username = doc.Descendants("category")
+                .FirstOrDefault(category => category.Attribute("name")?.Value == User)?
                 .Element("entry");
 
             if (tokenElement != null && prefixElement != null)
