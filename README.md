@@ -8,10 +8,10 @@ A Discord music bot coded entirely on C#. Arisu Edition adds a few unpolished bu
 
 - RconSharp Minecraft server communication for in-game music controls.
 
-- Minecraft server control from Discord. Launch your desired Minecraft server with Discord Commands(*currently in the works*).
+- Minecraft server control from Discord. Launch your desired Minecraft server with Discord Commands (*currently in the works*).
 
 # Partnered with:
 
-- Alice v.3.2, a simple Minecraft server UI to make creating and hosting Minecraft servers less intimidating.
+- [Alice v.3.2](https://github.com/Arima-Su/Alice-v.3.2), a simple Minecraft server UI to make creating and hosting Minecraft servers less intimidating.
 
 - BocchiUI, dislike having to run a console window whenever you want to use the bot? BocchiUI offers a simple UI wrapper that enables hiding the app in system tray and can even be activated on startup with no disturbances.
