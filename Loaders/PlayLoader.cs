@@ -11,6 +11,7 @@ using DSharpPlus.Lavalink;
 using DSharpPlus;
 using System.IO;
 using YoutubeExplode.Videos.Streams;
+using Alice_Module.Handlers;
 
 namespace Alice_Module.Loaders
 {
@@ -155,53 +156,27 @@ namespace Alice_Module.Loaders
         // SONG QUEUE
         public static async Task Enqueue(CommandContext ctx, string search)
         {
+            var res = Optimizations.StartUpSequence(ctx, false);
+            if (res != null)
+            {
+                await ctx.Channel.SendMessageAsync(res);
+                return;
+            }
             var lava = ctx.Client.GetLavalink();
             var node = lava.ConnectedNodes.Values.First();
+
+            var tracks = await Optimizations.QueueUpSequence(ctx, search);
+            await Optimizations.PlayUpSequence(ctx, node.GetGuildConnection(ctx.Member.VoiceState.Guild), tracks, false, true);
+        }
+
+        //FREEPLAY
+        public static async Task FreeEnqueue(LavalinkGuildConnection ctx, string search)
+        {
+            var node = ctx.Node;
 
             if (SlashComms._lavastarted == false)                                                                    // LAVALINK CHECK
             {
                 await ctx.Channel.SendMessageAsync("Please execute /start first so I can boot up the music player..");
-                return;
-            }
-
-            if (ctx.Member.VoiceState == null)
-            {
-                await ctx.Channel.SendMessageAsync("Nice try prankster but that's not how it works, you gotta be in the same voice channel as the player..");
-                return;
-            }
-
-            var cont = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
-
-            if (cont == null)
-            {
-                var channel = ctx.Member.VoiceState.Channel;
-
-                if (channel.Type is ChannelType.Voice)
-                {
-                    try
-                    {
-                        SlashComms._invited = false;
-                        await node.ConnectAsync(channel);
-                        Console.WriteLine("JOINED");
-                        SlashComms._ready = true;
-                    }
-                    catch
-                    {
-                        await ctx.Channel.SendMessageAsync("Brother, you're not even in a voice channel yet..");
-                    }
-                }
-            }
-
-            if (!lava.ConnectedNodes.Any())
-            {
-                await ctx.Channel.SendMessageAsync("Lavalink not connected.");
-                return;
-            }
-
-            // Check whether the bot is in a voice channel
-            if (ctx.Member.VoiceState == null || ctx.Member.VoiceState.Channel == null)
-            {
-                await ctx.Channel.SendMessageAsync("The bot is not in a voice channel.");
                 return;
             }
 
@@ -257,7 +232,7 @@ namespace Alice_Module.Loaders
                 track = loadResult.Tracks.First();
             }
 
-            var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
+            var conn = ctx.Node.GetGuildConnection(ctx.Guild);
 
             try
             {
@@ -268,13 +243,13 @@ namespace Alice_Module.Loaders
                     {
                         if (SlashComms._queueDictionary.ContainsKey(guild))
                         {
-                            SlashComms._queueDictionary[guild].Add(track);
+                            SlashComms._queueDictionary[guild].Add(new song(track, Program.User));
                         }
                         else
                         {
-                            SlashComms._queueDictionary.Add(guild, new List<LavalinkTrack>());
+                            SlashComms._queueDictionary.Add(guild, new List<song>());
                             await Task.Delay(100);
-                            SlashComms._queueDictionary[guild].Add(track);
+                            SlashComms._queueDictionary[guild].Add(new song(track, Program.User));
                         }
                         Program.skipped = true;
                         await conn.PlayAsync(track);
@@ -290,19 +265,19 @@ namespace Alice_Module.Loaders
                             Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
                         }
                         Program.skipped = false;
-                        await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
+                        await Program.UpdateUserStatus(Program.discord, "LISTENING", $"{track.Title} {track.Author}");
                     }
                     else
                     {
                         if (SlashComms._queueDictionary.ContainsKey(guild))
                         {
-                            SlashComms._queueDictionary[guild].Add(track);
+                            SlashComms._queueDictionary[guild].Add(new song(track, Program.User));
                         }
                         else
                         {
-                            SlashComms._queueDictionary.Add(guild, new List<LavalinkTrack>());
+                            SlashComms._queueDictionary.Add(guild, new List<song>());
                             await Task.Delay(100);
-                            SlashComms._queueDictionary[guild].Add(track);
+                            SlashComms._queueDictionary[guild].Add(new song(track, Program.User));
                         }
                         Program.skipped = true;
                         await conn.PlayAsync(track);
@@ -318,7 +293,7 @@ namespace Alice_Module.Loaders
                             Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
                         }
                         Program.skipped = false;
-                        await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
+                        await Program.UpdateUserStatus(Program.discord, "LISTENING", $"{track.Title} {track.Author}");
                     }
                 }
                 else
@@ -332,13 +307,13 @@ namespace Alice_Module.Loaders
                     {
                         if (SlashComms._queueDictionary.ContainsKey(guild))
                         {
-                            SlashComms._queueDictionary[guild].Add(track);
+                            SlashComms._queueDictionary[guild].Add(new song(track, Program.User));
                         }
                         else
                         {
-                            SlashComms._queueDictionary.Add(guild, new List<LavalinkTrack>());
+                            SlashComms._queueDictionary.Add(guild, new List<song>());
                             await Task.Delay(100);
-                            SlashComms._queueDictionary[guild].Add(track);
+                            SlashComms._queueDictionary[guild].Add(new song(track, Program.User));
                         }
                     }
                 }

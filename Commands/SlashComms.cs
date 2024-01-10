@@ -1,4 +1,5 @@
 ﻿using Alice.Responses;
+using Alice_Module.Handlers;
 using Alice_Module.Loaders;
 using AngleSharp.Text;
 using DSharpPlus.Entities;
@@ -10,520 +11,64 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace Alice.Commands
 {
     public class SlashComms : ApplicationCommandModule
     {
-        public static Dictionary<ulong, List<LavalinkTrack>> _queueDictionary = new Dictionary<ulong, List<LavalinkTrack>>();
+        public static Dictionary<ulong, List<song>> _queueDictionary = new Dictionary<ulong, List<song>>();
         public static int MaxQueueSize = 500; // Maximum number of songs allowed in the queue
         public static bool _lavastarted = false;
-        public static bool _playerIsPaused = false;
-        public static bool _invited = true;
-        public static bool _failed = false;
-        public static bool _ready = false;
+        public static bool _playerIsPaused = false; //TO BE UPDATED, CURRENTLY NOT CONCURRENT COMPAT
+        public static bool _invited = true; //TO BE UPDATED, OBSOLETE UNINSTALL
+        public static bool _failed = false; //TO BE UPDATED, CURRENTLY NOT CONCURRENT COMPAT
+        public static bool _ready = false; //TO BE UPDATED, OBSOLETE UNINSTALL
 
         [SlashCommand("join", "Invite Bocchi to your voice channel, just don't try anything weird..")]
         public async Task JoinCommand(InteractionContext ctx)
         {
-            var lava = ctx.Client.GetLavalink();
-            var node = lava.ConnectedNodes.Values.First();
-
-            if (_lavastarted == false)                                                                    // LAVALINK CHECK
+            await ctx.DeferAsync(ephemeral: true);
+            var res = Optimizations.StartUpSequence(ctx, true);
+            if (res != null)
             {
-                var ephemeralMessage = new DiscordInteractionResponseBuilder()
-                    .WithContent("Please execute /start first so I can boot up the music player..")
-                    .AsEphemeral(true);
-
-                await ctx.CreateResponseAsync(ephemeralMessage);
+                await ctx.FollowUpAsync(ResponseBuilder(res));
                 return;
-            }
-
-            if (ctx.Member.VoiceState == null)                                                           // VOICE CHANNEL CHECK
-            {
-                var ephemeralMessage = new DiscordInteractionResponseBuilder()
-                    .WithContent("Brother, you're not even in a voice channel yet..")
-                    .AsEphemeral(true);
-
-                await ctx.CreateResponseAsync(ephemeralMessage);
-                return;
-            }
-
-            var cont = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
-
-            if (cont == null)
-            {
-                var channel = ctx.Member.VoiceState.Channel;
-
-                if (channel.Type is DSharpPlus.ChannelType.Voice)
-                {
-                    try
-                    {
-                        _invited = true;
-                        _ready = true;
-                        await node.ConnectAsync(channel);
-                        //Console.WriteLine("JOINED");
-                        var ephemeralMessage = new DiscordInteractionResponseBuilder()
-                        .WithContent("Thanks..")
-                        .AsEphemeral(true); // Set ephemeral to true to make the message visible only to the user
-
-                        await ctx.CreateResponseAsync(ephemeralMessage);
-                    }
-                    catch
-                    {
-                        var ephemeralMessage = new DiscordInteractionResponseBuilder()
-                        .WithContent("Brother, you're not even in a voice channel yet..")
-                        .AsEphemeral(true); // Set ephemeral to true to make the message visible only to the user
-
-                        await ctx.CreateResponseAsync(ephemeralMessage);
-                    }
-                }
-            }
-            else
-            {
-                var ephemeralMessage = new DiscordInteractionResponseBuilder()
-                        .WithContent("I'm already here tho..")
-                        .AsEphemeral(true); // Set ephemeral to true to make the message visible only to the user
-
-                await ctx.CreateResponseAsync(ephemeralMessage);
             }
         }
 
         [SlashCommand("playskip", "Screw queues, play your song immediately..")]
         public async Task PlaySkipCommand(InteractionContext ctx, [Option("song", "Just put the title of the song you want..")] string search)
         {
+            await ctx.DeferAsync(ephemeral: true);
+            var res = Optimizations.StartUpSequence(ctx);
+            if (res != null)
+            {
+                await ctx.FollowUpAsync(ResponseBuilder(res));
+                return;
+            }
             var lava = ctx.Client.GetLavalink();
             var node = lava.ConnectedNodes.Values.First();
-            await ctx.DeferAsync(ephemeral: true);
 
-            if (_lavastarted == false)                                                                    // LAVALINK CHECK
-            {
-                var ephemeralMessage = new DiscordFollowupMessageBuilder()
-                    .WithContent("Please execute /start first so I can boot up the music player..")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage);
-                return;
-            }
-
-            if (ctx.Member.VoiceState == null)                                                           // VOICE CHANNEL CHECK
-            {
-                var ephemeralMessage = new DiscordFollowupMessageBuilder()
-                    .WithContent("Nice try but that's not how it works, you gotta be in the same voice channel..")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage);
-                return;
-            }
-
-            var cont = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
-
-            if (cont == null)                                                                            // AUTO JOIN
-            {
-                var channel = ctx.Member.VoiceState.Channel;
-
-                if (channel.Type is DSharpPlus.ChannelType.Voice)
-                {
-                    try
-                    {
-                        _invited = false;
-                        await node.ConnectAsync(channel);
-                        //Console.WriteLine("JOINED");
-                        _ready = true;
-                    }
-                    catch
-                    {
-                        var ephemeralMessage = new DiscordFollowupMessageBuilder()
-                        .WithContent($"Brother, you're not even in a voice channel yet..")
-                        .AsEphemeral(true);
-
-                        await ctx.FollowUpAsync(ephemeralMessage);
-                    }
-                }
-            }
-
-            if (!lava.ConnectedNodes.Any())                                                             // LAVALINK VERIFY
-            {
-                var ephemeralMessage = new DiscordFollowupMessageBuilder()
-                    .WithContent("Lavalink not connected.")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage);
-                return;
-            }
-
-            if (ctx.Member.VoiceState == null || ctx.Member.VoiceState.Channel == null)                 // BOT VOICESTATE VERIFY
-            {
-                var ephemeralMessage = new DiscordFollowupMessageBuilder()
-                    .WithContent("Brother, I'm not even in a voice channel yet..")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage);
-                return;
-            }
-
-            LavalinkTrack track;
-            ulong guild = ctx.Guild.Id;
-
-            if (Validates.IsYoutubeLink(search))
-            {
-                search = Converts.ConvertToShortenedUrl(search);
-
-                var loadResult = await node.Rest.GetTracksAsync(search, LavalinkSearchType.Plain);
-
-                if (loadResult.LoadResultType == LavalinkLoadResultType.LoadFailed || loadResult.LoadResultType == LavalinkLoadResultType.NoMatches)
-                {
-                    var ephemeralMessage3 = new DiscordFollowupMessageBuilder()
-                    .WithContent($"Failed to look for {search}")
-                    .AsEphemeral(true);
-
-                    await ctx.FollowUpAsync(ephemeralMessage3);
-                    return;
-                }
-
-                track = loadResult.Tracks.First();
-            }
-            else if (Validates.IsSpotifyLink(search))
-            {
-                var loadResult = await node.Rest.GetTracksAsync(search, LavalinkSearchType.Plain);
-
-                if (loadResult.LoadResultType == LavalinkLoadResultType.LoadFailed || loadResult.LoadResultType == LavalinkLoadResultType.NoMatches)
-                {
-                    var ephemeralMessage3 = new DiscordFollowupMessageBuilder()
-                    .WithContent($"Failed to look for {search}")
-                    .AsEphemeral(true);
-
-                    await ctx.FollowUpAsync(ephemeralMessage3);
-                    return;
-                }
-
-                track = loadResult.Tracks.First();
-            }
-            else if (Validates.IsSpotifyPlaylistLink(search))
-            {
-                var ephemeralMessage3 = new DiscordFollowupMessageBuilder()
-                    .WithContent("That's a playlist link.. provide a song link please..")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage3);
-                return;
-            }
-            else if (Validates.IsYouTubePlaylistLink(search))
-            {
-                var ephemeralMessage3 = new DiscordFollowupMessageBuilder()
-                    .WithContent("That's a playlist link.. provide a song link please..")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage3);
-                return;
-            }
-            else
-            {
-                var loadResult = await node.Rest.GetTracksAsync(search, LavalinkSearchType.Youtube);
-
-                if (loadResult.LoadResultType == LavalinkLoadResultType.LoadFailed || loadResult.LoadResultType == LavalinkLoadResultType.NoMatches)
-                {
-                    var ephemeralMessage3 = new DiscordFollowupMessageBuilder()
-                    .WithContent($"Failed to look for {search}")
-                    .AsEphemeral(true);
-
-                    await ctx.FollowUpAsync(ephemeralMessage3);
-                    return;
-                }
-
-                track = loadResult.Tracks.First();
-            }
-
-            var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
-
-            try
-            {
-                Program.skipped = true;
-                if (SlashComms._queueDictionary.ContainsKey(guild))
-                {
-                    _queueDictionary[guild].Insert(0, track);
-                    _queueDictionary[guild].RemoveAt(1);
-                    await conn.PlayAsync(track);
-                    var ephemeralMessage = new DiscordFollowupMessageBuilder()
-                        .WithContent($"Found it. Now Playing: {track.Title} {track.Author}")
-                        .AsEphemeral(true);
-
-                    await ctx.FollowUpAsync(ephemeralMessage);
-                    Program.skipped = false;
-                    Console.WriteLine("PLAYER IS PLAYING");
-                    if (SlashComms._queueDictionary.Count > 1)
-                    {
-                        Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
-                    }
-                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
-                }
-                else
-                {
-                    SlashComms._queueDictionary.Add(guild, new List<LavalinkTrack>());
-                    await Task.Delay(100);
-                    _queueDictionary[guild].Insert(0, track);
-                    _queueDictionary[guild].RemoveAt(1);
-                    await conn.PlayAsync(track);
-                    var ephemeralMessage = new DiscordFollowupMessageBuilder()
-                        .WithContent($"Found it. Now Playing: {track.Title} {track.Author}")
-                        .AsEphemeral(true);
-
-                    await ctx.FollowUpAsync(ephemeralMessage);
-                    Program.skipped = false;
-                    Console.WriteLine("PLAYER IS PLAYING");
-                    if (SlashComms._queueDictionary.Count > 1)
-                    {
-                        Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
-                    }
-                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
-                }
-            }
-            catch
-            {
-                var ephemeralMessage4 = new DiscordFollowupMessageBuilder()
-                    .WithContent($"{track.Title} {track.Author} failed to play")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage4);
-
-                var ephemeralMessage41 = new DiscordFollowupMessageBuilder()
-                    .WithContent("I'm gonna try that again..")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage41);
-
-                await PlaySkipCommand(ctx, search);
-            }
+            var tracks = await Optimizations.QueueUpSequence(ctx, search);
+            await Optimizations.PlayUpSequence(ctx, node.GetGuildConnection(ctx.Member.VoiceState.Guild), tracks, true);
         }
 
         [SlashCommand("play", "Abider of social norms, put your song in the waiting queue..")]
         public async Task PlayCommand(InteractionContext ctx, [Option("song", "Just put the title of the song you want..")] string search)
         {
+            await ctx.DeferAsync(ephemeral: true);
+            var res = Optimizations.StartUpSequence(ctx);
+            if (res != null)
+            {
+                await ctx.FollowUpAsync(ResponseBuilder(res));
+                return;
+            }
             var lava = ctx.Client.GetLavalink();
             var node = lava.ConnectedNodes.Values.First();
-            await ctx.DeferAsync(ephemeral: true);
 
-            if (_lavastarted == false)                                                                    // LAVALINK CHECK
-            {
-                var ephemeralMessage = new DiscordFollowupMessageBuilder()
-                    .WithContent("Please execute /start first so I can boot up the music player..")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage);
-                return;
-            }
-
-            if (ctx.Member.VoiceState == null)                                                            // VOICE CHANNEL CHECK
-            {
-                var ephemeralMessage = new DiscordFollowupMessageBuilder()
-                    .WithContent("Nice try prankster but that's not how it works, you gotta be in the same voice channel as the player..")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage);
-                return;
-            }
-
-            var cont = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
-
-            if (cont == null)                                                                            // AUTO JOIN
-            {
-                var channel = ctx.Member.VoiceState.Channel;
-
-                if (channel.Type is DSharpPlus.ChannelType.Voice)
-                {
-                    try
-                    {
-                        _invited = false;
-                        await node.ConnectAsync(channel);
-                        //Console.WriteLine("JOINED");
-                        _ready = true;
-                        Console.WriteLine("Auto Connected");
-                    }
-                    catch
-                    {
-                        var ephemeralMessage = new DiscordFollowupMessageBuilder()
-                        .WithContent($"Brother, you're not even in a voice channel yet..")
-                        .AsEphemeral(true);
-
-                        await ctx.FollowUpAsync(ephemeralMessage);
-                    }
-                }
-            }
-
-            if (!lava.ConnectedNodes.Any())                                                             // LAVALINK VERIFY
-            {
-                var ephemeralMessage2 = new DiscordFollowupMessageBuilder()
-                    .WithContent("Lavalink not connected.")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage2);
-                return;
-            }
-
-            if (ctx.Member.VoiceState == null || ctx.Member.VoiceState.Channel == null)             // BOT VOICESTATE VERIFY
-            {
-                var ephemeralMessage3 = new DiscordFollowupMessageBuilder()
-                    .WithContent("The bot is not in a voice channel.")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage3);
-                return;
-            }
-
-            LavalinkTrack track;
-            ulong guild = ctx.Guild.Id;
-
-            if (Validates.IsYoutubeLink(search))
-            {
-                search = Converts.ConvertToShortenedUrl(search);
-
-                var loadResult = await node.Rest.GetTracksAsync(search, LavalinkSearchType.Plain);
-
-                if (loadResult.LoadResultType == LavalinkLoadResultType.LoadFailed || loadResult.LoadResultType == LavalinkLoadResultType.NoMatches)
-                {
-                    var ephemeralMessage3 = new DiscordFollowupMessageBuilder()
-                    .WithContent($"Failed to look for {search}")
-                    .AsEphemeral(true);
-
-                    await ctx.FollowUpAsync(ephemeralMessage3);
-                    return;
-                }
-
-                track = loadResult.Tracks.First();
-            }
-            else if (Validates.IsSpotifyLink(search))
-            {
-                var loadResult = await node.Rest.GetTracksAsync(search, LavalinkSearchType.Plain);
-
-                if (loadResult.LoadResultType == LavalinkLoadResultType.LoadFailed || loadResult.LoadResultType == LavalinkLoadResultType.NoMatches)
-                {
-                    var ephemeralMessage3 = new DiscordFollowupMessageBuilder()
-                    .WithContent($"Failed to look for {search}")
-                    .AsEphemeral(true);
-
-                    await ctx.FollowUpAsync(ephemeralMessage3);
-                    return;
-                }
-
-                track = loadResult.Tracks.First();
-            }
-            else if (Validates.IsSpotifyPlaylistLink(search))
-            {
-                var ephemeralMessage3 = new DiscordFollowupMessageBuilder()
-                    .WithContent("That's a playlist link.. provide a song link please..")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage3);
-                return;
-            }
-            else if (Validates.IsYouTubePlaylistLink(search))
-            {
-                var ephemeralMessage3 = new DiscordFollowupMessageBuilder()
-                    .WithContent("That's a playlist link.. provide a song link please..")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage3);
-                return;
-            }
-            else
-            {
-                var loadResult = await node.Rest.GetTracksAsync(search, LavalinkSearchType.Youtube);
-
-                if (loadResult.LoadResultType == LavalinkLoadResultType.LoadFailed || loadResult.LoadResultType == LavalinkLoadResultType.NoMatches)
-                {
-                    var ephemeralMessage3 = new DiscordFollowupMessageBuilder()
-                    .WithContent($"Failed to look for {search}")
-                    .AsEphemeral(true);
-
-                    await ctx.FollowUpAsync(ephemeralMessage3);
-                    return;
-                }
-
-                track = loadResult.Tracks.First();
-            }
-
-            var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
-
-            try
-            {
-                if (conn.CurrentState.CurrentTrack == null)
-                {
-
-                    if (SlashComms._queueDictionary.ContainsKey(guild))
-                    {
-                        SlashComms._queueDictionary[guild].Add(track);
-                    }
-                    else
-                    {
-                        SlashComms._queueDictionary.Add(guild, new List<LavalinkTrack>());
-                        await Task.Delay(100);
-                        SlashComms._queueDictionary[guild].Add(track);
-                    }
-                    Program.skipped = true;
-                    await conn.PlayAsync(track);
-                    var ephemeralMessage1 = new DiscordFollowupMessageBuilder()
-                        .WithContent($"Now Playing: {track.Title} {track.Author}")
-                        .AsEphemeral(true);
-
-                    await ctx.FollowUpAsync(ephemeralMessage1);
-                    Program.skipped = false;
-
-                    Console.WriteLine("PLAYER IS PLAYING");
-                    if (SlashComms._queueDictionary.Count > 1)
-                    {
-                        Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"NOW PLAYING: {track.Title} {track.Author}");
-                    }
-                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{track.Title} {track.Author}");
-                }
-                else
-                {
-                    if (_queueDictionary[guild].Count >= MaxQueueSize)                                            // QUEUE SIZE CHECK
-                    {
-                        var ephemeralMessage2 = new DiscordFollowupMessageBuilder()
-                            .WithContent($"Max queue length was set to {MaxQueueSize}, wait for songs to finish")
-                            .AsEphemeral(true);
-
-                        await ctx.FollowUpAsync(ephemeralMessage2);
-                    }
-                    else
-                    {
-                        _queueDictionary[guild].Add(track);
-                        var ephemeralMessage3 = new DiscordFollowupMessageBuilder()
-                            .WithContent($"Added to Queue: {track.Title} {track.Author}")
-                            .AsEphemeral(true);
-
-                        await ctx.FollowUpAsync(ephemeralMessage3);
-                    }
-                }
-            }
-            catch
-            {
-                var ephemeralMessage4 = new DiscordFollowupMessageBuilder()
-                    .WithContent($"{track.Title} {track.Author} failed to play")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage4);
-
-                var ephemeralMessage41 = new DiscordFollowupMessageBuilder()
-                    .WithContent("I'm gonna try that again..")
-                    .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ephemeralMessage41);
-
-                await PlayCommand(ctx, search);
-            }
+            var tracks = await Optimizations.QueueUpSequence(ctx, search);
+            await Optimizations.PlayUpSequence(ctx, node.GetGuildConnection(ctx.Member.VoiceState.Guild), tracks);
         }
 
         [SlashCommand("np", "What the heel is this song?")]
@@ -567,7 +112,7 @@ namespace Alice.Commands
             if (conn.CurrentState.CurrentTrack != null)                                               // NOW PLAYING COMMAND
             {
                 var currentTrack = conn.CurrentState.CurrentTrack;
-                var trackInfo = $"***Now Playing: {currentTrack.Title} {currentTrack.Author} [{currentTrack.Length}]***";
+                var trackInfo = $"***Now Playing: {currentTrack.Title} {currentTrack.Author} [{currentTrack.Length}]***\n*Requested by: {SlashComms._queueDictionary[ctx.Guild.Id][0].getUser()}*";
 
                 var ephemeralMessage = new DiscordInteractionResponseBuilder()
                     .WithContent(trackInfo)
@@ -783,6 +328,7 @@ namespace Alice.Commands
         public async Task QueueCommand(InteractionContext ctx, [Option("page", "Input an integer, jokes on you I handled exceptions.. Can't break my code today..")] string page)
         {
             await ctx.DeferAsync(ephemeral: true);
+            ulong guild = ctx.Guild.Id;
 
             if (_lavastarted == false)                                                                    // LAVALINK CHECK
             {
@@ -790,7 +336,11 @@ namespace Alice.Commands
                 return;
             }
 
-            ulong guild = ctx.Guild.Id;
+            if (SlashComms._queueDictionary.Count == 0 || SlashComms._queueDictionary[guild] is null || SlashComms._queueDictionary[guild].Count == 0)
+            {
+                await ctx.Channel.SendMessageAsync("The queue is empty.");
+                return;
+            }
 
             if (SlashComms._queueDictionary[guild].Count > 0 && SlashComms._queueDictionary[guild] != null)
             {
@@ -841,22 +391,22 @@ namespace Alice.Commands
                                 // Append the track information to the message
                                 if (trackNumber == 1)
                                 {
-                                    message.AppendLine($"***Now Playing: {track.Title} {track.Author}***");
+                                    message.AppendLine($"***Now Playing: {track.getTrack().Title} {track.getTrack().Author}***");
                                 }
                                 else
                                 {
-                                    message.AppendLine($"{trackNumber}. {track.Title} {track.Author}");
+                                    message.AppendLine($"{trackNumber}. {track.getTrack().Title} {track.getTrack().Author}");
                                 }
                             }
 
-                            queueLength += track.Length;
+                            queueLength += track.getTrack().Length;
                             trackNumber++;
                         }
                     }
 
                     if (trackNumber > 1)
                     {
-                        message.AppendLine($"***{trackNumber - 1} total songs for {queueLength} long..***");
+                        message.AppendLine($"***{trackNumber - 1} total songs for {TimeSpan.FromSeconds(Math.Round(queueLength.TotalSeconds))} long..***");
                         await ctx.FollowUpAsync(ResponseBuilder(message.ToString()));
                     }
                     else
@@ -879,21 +429,21 @@ namespace Alice.Commands
                             // Append the track information to the message
                             if (trackNumber == 1)
                             {
-                                message.AppendLine($"***Now Playing: {track.Title} {track.Author}***");
+                                message.AppendLine($"***Now Playing: {track.getTrack().Title} {track.getTrack().Author}***");
                             }
                             else
                             {
-                                message.AppendLine($"{trackNumber}. {track.Title} {track.Author}");
+                                message.AppendLine($"{trackNumber}. {track.getTrack().Title} {track.getTrack().Author}");
                             }
 
-                            queueLength += track.Length;
+                            queueLength += track.getTrack().Length;
                             trackNumber++;
                         }
                     }
 
                     if (trackNumber > 1)
                     {
-                        message.AppendLine($"***{trackNumber - 1} total songs for {queueLength} long..***");
+                        message.AppendLine($"***{trackNumber - 1} total songs for {TimeSpan.FromSeconds(Math.Round(queueLength.TotalSeconds))} long..***");
                         await ctx.FollowUpAsync(ResponseBuilder(message.ToString()));
                     }
                     else
@@ -1026,7 +576,7 @@ namespace Alice.Commands
                 {
                     var tune = SlashComms._queueDictionary[guild][0];
                     var ephemeralMessage1 = new DiscordInteractionResponseBuilder()                          // BOT VOICESTATE VERIFY
-                        .WithContent($"Removed {tune.Title}")
+                        .WithContent($"Removed {tune.getTrack().Title}")
                         .AsEphemeral(true);
 
                     await ctx.CreateResponseAsync(ephemeralMessage1);
@@ -1046,11 +596,11 @@ namespace Alice.Commands
                 }
 
                 var nextTrack = _queueDictionary[guild][1];                                                           // REMOVE COMMAND
-                var nextTrackTitle = nextTrack.Title;
+                var nextTrackTitle = nextTrack.getTrack().Title;
                 var track = _queueDictionary[guild][0];
-                var trackTitle = track.Title;
+                var trackTitle = track.getTrack().Title;
                 Program.skipped = true;
-                await conn.PlayAsync(nextTrack);
+                await conn.PlayAsync(nextTrack.getTrack());
                 _queueDictionary[guild].RemoveAt(0);
 
                 var ephemeralMessage2 = new DiscordInteractionResponseBuilder()
@@ -1065,14 +615,14 @@ namespace Alice.Commands
                 }
                 else
                 {
-                    Console.WriteLine($"***Now Playing: {nextTrackTitle} {nextTrack.Author}***");
+                    Console.WriteLine($"***Now Playing: {nextTrackTitle} {nextTrack.getTrack().Author}***");
                 }
                 await Program.UpdateUserStatus(ctx.Client, "LISTENING", nextTrackTitle);
                 return;
             }
 
             var song = _queueDictionary[guild][trackNum - 1];
-            var songTitle = song.Title;
+            var songTitle = song.getTrack().Title;
             _queueDictionary[guild].RemoveAt(trackNum - 1);
             var ephemeralMessage = new DiscordInteractionResponseBuilder()
                 .WithContent($"Eliminated {songTitle}..")
@@ -1085,11 +635,14 @@ namespace Alice.Commands
         public async Task SkipToCommand(InteractionContext ctx, [Option("track", "Just put the track number of the song you want to skip to..")] string Num)
         {
             await ctx.DeferAsync(ephemeral: true);
-            if (_lavastarted == false)                                                                    // LAVALINK CHECK
+            var res = Optimizations.StartUpSequence(ctx);
+            if (res != null)
             {
-                await ctx.FollowUpAsync(ResponseBuilder("Please execute /start first so I can boot up the music player.."));
+                await ctx.FollowUpAsync(SlashComms.ResponseBuilder(res));
                 return;
             }
+            var lava = ctx.Client.GetLavalink();
+            var node = lava.ConnectedNodes.Values.First();
 
             ulong guild = ctx.Guild.Id;
 
@@ -1105,14 +658,6 @@ namespace Alice.Commands
                 return;
             }
 
-            if (ctx.Member.VoiceState == null)                                                  // VOICECHANNEL CHECK
-            {
-                await ctx.FollowUpAsync(ResponseBuilder("Nice try but that's not how it works, you gotta be in the same voice channel.."));
-                return;
-            }
-
-            var lava = ctx.Client.GetLavalink();
-            var node = lava.ConnectedNodes.Values.First();
             var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
 
             if (conn == null)
@@ -1126,9 +671,9 @@ namespace Alice.Commands
 
             Program.skipped = true;
             var currentTrack = _queueDictionary[guild][0];
-            await conn.PlayAsync(currentTrack);
+            await conn.PlayAsync(currentTrack.getTrack());
             await ctx.FollowUpAsync(ResponseBuilder($"Removed {tracksToRemove.Count} tracks from the queue.."));
-            await ctx.FollowUpAsync(ResponseBuilder($"***Now Playing: {currentTrack.Title} {currentTrack.Author}***"));
+            await ctx.FollowUpAsync(ResponseBuilder($"***Now Playing: {currentTrack.getTrack().Title} {currentTrack.getTrack().Author}***"));
 
             if (SlashComms._queueDictionary.Count > 1)
             {
@@ -1136,9 +681,9 @@ namespace Alice.Commands
             }
             else
             {
-                Console.WriteLine($"NOW PLAYING: {currentTrack.Title} {currentTrack.Author}");
+                Console.WriteLine($"NOW PLAYING: {currentTrack.getTrack().Title} {currentTrack.getTrack().Author}");
             }
-            await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{currentTrack.Title} {currentTrack.Author}");
+            await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{currentTrack.getTrack().Title} {currentTrack.getTrack().Author}");
             Program.skipped = false;
         }
 
@@ -1165,7 +710,7 @@ namespace Alice.Commands
             var random = new Random();
             var shuffledSongs = remainingSongs.OrderBy(x => random.Next()).ToList();
 
-            _queueDictionary[guild] = new List<LavalinkTrack> { firstSong };
+            _queueDictionary[guild] = new List<song> { firstSong };
             _queueDictionary[guild].AddRange(shuffledSongs);
 
             await HiddenSend("Disorganized the list of songs requested by abiders of social norms..", ctx);
@@ -1175,39 +720,19 @@ namespace Alice.Commands
         public async Task SkipCommand(InteractionContext ctx)
         {
             await ctx.DeferAsync(ephemeral: true);
-            
-            ulong guild = ctx.Guild.Id;
+
+            var res = Optimizations.StartUpSequence(ctx);
+            if (res != null)
+            {
+                await ctx.Channel.SendMessageAsync(res);
+                return;
+            }
             var lava = ctx.Client.GetLavalink();
             var node = lava.ConnectedNodes.Values.First();
+
+            ulong guild = ctx.Guild.Id;
+            
             var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
-
-            if (_lavastarted == false)                                                                    // LAVALINK CHECK
-            {
-                await ctx.FollowUpAsync(ResponseBuilder("Please execute /start first so I can boot up the music player.."));
-                return;
-            }
-
-            if (ctx.Member.VoiceState == null)                                              // VOICECHANNEL CHECK
-            {
-                await ctx.FollowUpAsync(ResponseBuilder("Nice try but that's not how it works, you gotta be in the same voice channel.."));
-                return;
-            }
-
-            if (conn == null)
-            {
-                await ctx.FollowUpAsync(ResponseBuilder("Brother, I'm not even in a voice channel yet.."));
-                return;
-            }
-
-            if (_queueDictionary[guild].Count < 2)                               // NUMBER LOGIC
-            {
-                var track = SlashComms._queueDictionary[guild][0];
-                await ctx.FollowUpAsync(ResponseBuilder($"Skipped {track.Title} {track.Author}"));
-                await Program.UpdateUserStatus(ctx.Client, "IDLE", "bocchi");
-                SlashComms._queueDictionary.Remove(guild);
-                await conn.StopAsync();
-                return;
-            }
 
             if (SlashComms._queueDictionary[guild] == null)
             {
@@ -1215,94 +740,56 @@ namespace Alice.Commands
                 return;
             }
 
+            if (_queueDictionary[guild].Count < 2)                               // NUMBER LOGIC
+            {
+                var track = SlashComms._queueDictionary[guild][0];
+                await ctx.FollowUpAsync(ResponseBuilder($"Skipped {track.getTrack().Title} {track.getTrack().Author}"));
+                await Program.UpdateUserStatus(ctx.Client, "IDLE", "bocchi");
+                SlashComms._queueDictionary.Remove(guild);
+                await conn.StopAsync();
+                return;
+            }
+
             if (SlashComms._queueDictionary[guild].Count < 2)
             {
                 var track = SlashComms._queueDictionary[guild][0];
 
-                await ctx.FollowUpAsync(ResponseBuilder($"Skipped {track.Title} {track.Author}"));
+                await ctx.FollowUpAsync(ResponseBuilder($"Skipped {track.getTrack().Title} {track.getTrack().Author}"));
 
                 SlashComms._queueDictionary.Remove(guild);
                 await conn.StopAsync();
                 return;
             }
 
-            if (conn.CurrentState.CurrentTrack != null)                                            //SKIP COMMAND
+            try
             {
                 var nextTrack = _queueDictionary[guild][1];
                 var track = _queueDictionary[guild][0];
                 Program.skipped = true;
-                await conn.PlayAsync(nextTrack);
+                await conn.PlayAsync(nextTrack.getTrack());
                 _queueDictionary[guild].RemoveAt(0);
-                await ctx.FollowUpAsync(ResponseBuilder($"Skipped {track.Title} {track.Author}.."));
+                await ctx.FollowUpAsync(ResponseBuilder($"Skipped {track.getTrack().Title} {track.getTrack().Author}.."));
                 if (SlashComms._queueDictionary.Count > 1)
                 {
                     Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
                 }
                 else
                 {
-                    Console.WriteLine($"NOW PLAYING: {nextTrack.Title} {nextTrack.Author}");
+                    Console.WriteLine($"NOW PLAYING: {nextTrack.getTrack().Title} {nextTrack.getTrack().Author}");
                 }
-                await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{nextTrack.Title} {nextTrack.Author}");
+                await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{nextTrack.getTrack().Title} {nextTrack.getTrack().Author}");
                 Program.skipped = false;
             }
-            else
+            catch
             {
-                try
-                {
-                    var nextTrack = _queueDictionary[guild][1];
-                    var track = _queueDictionary[guild][0];
-                    Program.skipped = true;
-                    await conn.PlayAsync(nextTrack);
-                    _queueDictionary[guild].RemoveAt(0);
-                    await ctx.FollowUpAsync(ResponseBuilder($"Skipped {track.Title} {track.Author}.."));
-                    if (SlashComms._queueDictionary.Count > 1)
-                    {
-                        Console.WriteLine($"CONCURRENT: {SlashComms._queueDictionary.Count}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"NOW PLAYING: {nextTrack.Title} {nextTrack.Author}");
-                    }
-                    await Program.UpdateUserStatus(ctx.Client, "LISTENING", $"{nextTrack.Title} {nextTrack.Author}");
-                    Program.skipped = false;
-                }
-                catch
-                {
-                    await ctx.FollowUpAsync(ResponseBuilder("I tried, but there really is no song to skip to.."));
-                }     
+                await ctx.FollowUpAsync(ResponseBuilder("I tried, but there really is no song to skip to.."));
             }
         }
 
         [SlashCommand("help", "Displays the list of commands")]
         public async Task HelpCommand(InteractionContext ctx)
         {
-            var embedBuilder = new DiscordEmbedBuilder()
-                .WithTitle("Command List")
-                .AddField("Prefix", "You can either use (/) or (bocchi!) to trigger these commands..")
-                .WithDescription("Here are the things you can tell bocchi:")
-                .AddField("\u200B", "\u200B")
-                .AddField("start", "Starts up the player and enables the music related commands")
-                .AddField("\u200B", "\u200B")
-                .AddField("join", "Joins the user's current voice channel.")
-                .AddField("byebye", "Leaves the user's current voice channel.")
-                .AddField("play [song]", "Plays the specified song.")
-                .AddField("playskip [song]", "Plays a song immediately")
-                .AddField("load [playlist]", "Add a playlist to the queue")
-                .AddField("stop", "Stops the music playback and clears the queue.")
-                .AddField("skip", "Skips the current song.")
-                .AddField("skipto [number]", "Skips the specified song number.")
-                .AddField("remove [number]", "Removes an entry from the queue")
-                .AddField("np", "Shows currently playing song.")
-                .AddField("queue", "Shows song queue.")
-                .AddField("resume", "Resumes the current song.")
-                .AddField("pause", "Pauses the current song.")
-                .AddField("loop", "Loops the current song.")
-                .AddField("help", "Displays this list.")
-                .AddField("\u200B", "\u200B")
-                .AddField("Others", "Sometimes specific words can trigger a bocchi response..")
-                .AddField("Just be nice to her..", "She's trying her best..")
-                .WithColor(new DiscordColor("#ffd8e1"));
-
+            var embedBuilder = HelpBuilder();
             var embed = embedBuilder.Build();
             await ctx.CreateResponseAsync(embed: embed);
         }
@@ -1311,23 +798,16 @@ namespace Alice.Commands
         public async Task StartCommand(InteractionContext ctx)
         {
             await ctx.DeferAsync(ephemeral: true);
-
-            if (_lavastarted == true)                                               //LAVALINK CHECK
+            
+            if (SlashComms._lavastarted)
             {
-                await ctx.FollowUpAsync(ResponseBuilder("The music player is already running bro.."));
+                await ctx.FollowUpAsync(ResponseBuilder("It's already running.."));
                 return;
             }
 
-            var f = await ctx.FollowUpAsync(ResponseBuilder("Ooh it's starting up.."));
-            Console.WriteLine("LAVALINK IS STARTING");
-            await Program.StartLava();
+            DiscordMessage f = await ctx.FollowUpAsync(ResponseBuilder("Ooh it's starting up.."));
 
-            if (_failed == true)
-            {
-                await ctx.EditFollowupAsync(f.Id, ResponseEditBuilder("I encountered a problem, @Sean-san send help please.."));
-                return;
-            }
-            else
+            try
             {
                 var endpoint = new ConnectionEndpoint
                 {
@@ -1347,7 +827,7 @@ namespace Alice.Commands
                 var lavalink = discord.GetLavalink();
                 await lavalink.ConnectAsync(lavalinkConfig);
 
-                _lavastarted = true;
+                SlashComms._lavastarted = true;
 
                 var lava = discord.GetLavalink();
                 var node = lava.ConnectedNodes.Values.First();
@@ -1359,117 +839,105 @@ namespace Alice.Commands
                 await ctx.EditFollowupAsync(f.Id, ResponseEditBuilder("Oop, it's running.. there it goes.."));
                 Console.WriteLine("LAVALINK IS CONNECTED");
             }
+            catch
+            {
+                Console.WriteLine("LAVALINK IS STARTING");
+                await Program.StartLava();
+
+                var endpoint = new ConnectionEndpoint
+                {
+                    Hostname = "127.0.0.1",
+                    Port = 2333
+                };
+
+                var lavalinkConfig = new LavalinkConfiguration
+                {
+                    Password = "If there was an",
+                    RestEndpoint = endpoint,
+                    SocketEndpoint = endpoint,
+                    SocketAutoReconnect = false
+                };
+
+                var discord = ctx.Client;
+                var lavalink = discord.GetLavalink();
+                await lavalink.ConnectAsync(lavalinkConfig);
+
+                SlashComms._lavastarted = true;
+
+                var lava = discord.GetLavalink();
+                var node = lava.ConnectedNodes.Values.First();
+
+                //Lavalink Event Handlers
+                node.PlaybackFinished += Program.PlaybackFinishedHandler;
+                node.TrackException += Program.PlaybackErrorHandler;
+
+                await ctx.EditFollowupAsync(f.Id, ResponseEditBuilder("Oop, it's running.. there it goes.."));
+                Console.WriteLine("LAVALINK IS CONNECTED");
+
+                if (SlashComms._failed == true)
+                {
+                    await ctx.EditFollowupAsync(f.Id, ResponseEditBuilder("I encountered a problem, @Sean-san send help please.."));
+                    return;
+                }
+            }
         }
 
         [SlashCommand("load", "Carpet bomb the queue with your songs..")]
         public async Task LoadCommand(InteractionContext ctx, [Option("playlist", "Paste in your playlist link..")] string list)
         {
             await ctx.DeferAsync(ephemeral: true);
-            List<string> songTitles;
 
-            if (_lavastarted == false)                                                                    // LAVALINK CHECK
+            var res = Optimizations.StartUpSequence(ctx);
+            if (res != null)
             {
-                await ctx.FollowUpAsync(ResponseBuilder("Please execute /start first so I can boot up the music player.."));
+                await ctx.FollowUpAsync(ResponseBuilder(res));
                 return;
             }
 
-            if (ctx.Member.VoiceState == null)
-            {
-                var re = MessageHandler.GetRandomEntry("Nanis");
-                await ctx.FollowUpAsync(ResponseBuilder($"{re} get into a voice channel first.."));
-                return;
-            }
+            var songLinks = new List<string>(); ;
 
             if (Validates.IsYouTubePlaylistLink(list))
             {
-                songTitles = await SlashPlayLoader.YoutubeLoaderAsync(list);
-
-                if (songTitles == null || songTitles.Count == 0)
-                {
-                    await ctx.FollowUpAsync(ResponseBuilder("No songs found in playlist."));
-                    return;
-                }
-
-                await ctx.FollowUpAsync(ResponseBuilder("Loading Playlist.."));
-                var f = await ctx.FollowUpAsync(ResponseBuilder("_ songs queue'd.."));
-                int songCount = 0;
-                
-                foreach (string title in songTitles)
-                {
-                    Program.unbroken = true;
-
-                    if (SlashPlayLoader._queuefull == true)
-                    {
-                        SlashPlayLoader._queuefull = false;
-                        break;
-                    }
-
-                    if (Program.forcestop == true)
-                    {
-                        Program.unbroken = false;
-                        break;
-                    }
-
-                    ++songCount;
-
-                    await ctx.EditFollowupAsync(f.Id, ResponseEditBuilder($"{songCount} songs queue'd.."));
-                    await SlashPlayLoader.Enqueue(ctx, title);
-                }
-
-                await ctx.EditFollowupAsync(f.Id, ResponseEditBuilder("Playlist Loaded."));
-                return;
+                songLinks = await SlashPlayLoader.YoutubeLoaderAsync(list);
             }
             else if (Validates.IsSpotifyPlaylistLink(list))
             {
-                string playlistId = Converts.ExtractSpotifyPlaylistId(list);
-
-                var songslinks = await SpotifyLoader.GetPlaylistSongLinks(playlistId);
-                Console.WriteLine("Ohh its spotify");
-
-                if (songslinks == null || songslinks.Count == 0)
-                {
-                    await ctx.FollowUpAsync(ResponseBuilder("No songs found in the playlist."));
-                    return;
-                }
-
-                await ctx.FollowUpAsync(ResponseBuilder("Loading Playlist.."));
-                var f = await ctx.FollowUpAsync(ResponseBuilder("_ songs queue'd.."));
-                int songCount = 0;
-
-                foreach (var link in songslinks)
-                {
-                    Program.unbroken = true;
-
-                    if (SlashPlayLoader._queuefull == true)
-                    {
-                        SlashPlayLoader._queuefull = false;
-                        break;
-                    }
-
-                    if (Program.forcestop == true)
-                    {
-                        Program.unbroken = false;
-                        break;
-                    }
-
-                    songCount++;
-
-                    await ctx.EditFollowupAsync(f.Id, ResponseEditBuilder($"{songCount} songs queue'd.."));
-                    await SlashPlayLoader.Enqueue(ctx, link);
-                }
-
-                var ephemeralMessage14 = new DiscordFollowupMessageBuilder()
-                           .WithContent("Playlist loaded.")
-                           .AsEphemeral(true);
-
-                await ctx.FollowUpAsync(ResponseBuilder("Playlist Loaded."));
-                return;
+                songLinks = await SpotifyLoader.GetPlaylistSongLinks(Converts.ExtractSpotifyPlaylistId(list));
             }
-            else
+
+            if (songLinks == null || songLinks.Count == 0)
             {
-                await ctx.FollowUpAsync(ResponseBuilder("Invalid playlist link."));
+                await ctx.FollowUpAsync(ResponseBuilder("No songs found in playlist."));
                 return;
             }
+
+            await ctx.FollowUpAsync(ResponseBuilder("Loading Playlist.."));
+            var f = await ctx.FollowUpAsync(ResponseBuilder("_ songs queue'd.."));
+            int songCount = 0;
+
+            foreach (string title in songLinks)
+            {
+                Program.unbroken = true;
+
+                if (SlashPlayLoader._queuefull == true)
+                {
+                    SlashPlayLoader._queuefull = false;
+                    break;
+                }
+
+                if (Program.forcestop == true)
+                {
+                    Program.unbroken = false;
+                    break;
+                }
+
+                ++songCount;
+
+                await ctx.EditFollowupAsync(f.Id, ResponseEditBuilder($"{songCount} songs queue'd.."));
+                await SlashPlayLoader.Enqueue(ctx, title);
+            }
+
+            await ctx.EditFollowupAsync(f.Id, ResponseEditBuilder("Playlist Loaded."));
         }
 
         [SlashCommand("loop", "Shawty's like a melody in my head..")]
@@ -1546,6 +1014,158 @@ namespace Alice.Commands
 
         }
 
+        [SlashCommand("rest", "She needs some from time to time..")]
+        public async Task RestCommand(InteractionContext ctx)
+        {
+            await ctx.DeferAsync(ephemeral: true);
+            List<song> holdqueue;
+            //STORE
+            try
+            {
+                holdqueue = SlashComms._queueDictionary[ctx.Guild.Id];
+            }
+            catch
+            {
+                await ctx.FollowUpAsync(ResponseBuilder($"{MessageHandler.GetRandomEntry("Nanis")} I don't need that right now.."));
+                return;
+            }
+
+            await ctx.FollowUpAsync(ResponseBuilder("Alright, let me just fix myself up.."));
+            Program.skipped = true;
+            //LEAVE
+            var lava = ctx.Client.GetLavalink();
+            var node = lava.ConnectedNodes.Values.First();
+
+            if (ctx.Member.VoiceState == null)
+            {
+                await ctx.FollowUpAsync(ResponseBuilder("Unfortunately that's not how it works, you gotta be in the same voice channel.."));
+                return;
+            }
+
+            var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
+            ulong guild = ctx.Guild.Id;
+
+            if (conn == null)
+            {
+                await ctx.FollowUpAsync(ResponseBuilder($"{MessageHandler.GetRandomEntry("Nanis")} I'm already out.."));
+            }
+            else
+            {
+                Program.skipped = true;
+                await conn.StopAsync();
+                Program.skipped = false;
+                SlashComms._invited = false;
+                SlashComms._queueDictionary.Remove(guild);
+                await conn.DisconnectAsync();
+            }
+            await Task.Delay(1000);
+            //JOIN
+            try
+            {
+                var res = Optimizations.StartUpSequence(ctx);
+                if (res != null)
+                {
+                    await ctx.FollowUpAsync(ResponseBuilder(res));
+                    return;
+                }
+                lava = ctx.Client.GetLavalink();
+                node = lava.ConnectedNodes.Values.First();
+
+                await Task.Delay(1000);
+                SlashComms._queueDictionary.Add(guild, holdqueue);
+                var song = SlashComms._queueDictionary[guild][0];
+
+                var connt = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
+
+                await connt.PlayAsync(song.getTrack());
+                await ctx.FollowUpAsync(ResponseBuilder("That was nice, time to get back to work.."));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+            }
+            Program.skipped = false;
+        }
+
+        [SlashCommand("volume", "Adjusts the volume..")]
+        public async Task VolumeCommand(InteractionContext ctx, [Option("volume", "0-100, a lot of range to choose from..")] string volume)
+        {
+            await ctx.DeferAsync(true);
+
+            var res = Optimizations.StartUpSequence(ctx);
+            if (res != null)
+            {
+                await ctx.FollowUpAsync(ResponseBuilder(res));
+                return;
+            }
+            var lava = ctx.Client.GetLavalink();
+            var node = lava.ConnectedNodes.Values.First();
+
+            if (!int.TryParse(volume, out int level))
+            {
+                await ctx.FollowUpAsync(ResponseBuilder("That is not a valid number."));
+                return;
+            }
+
+            if (level >= 0 && level <= 100)
+            {
+                var conn = node.GetGuildConnection(ctx.Member.VoiceState.Guild);
+                await conn.SetVolumeAsync(level);
+
+                await ctx.FollowUpAsync(ResponseBuilder("I turned the volume knob to " + level));
+
+                //if (!Program.Volumes.ContainsKey(ctx.Guild.Id))  //Default setter
+                //{
+                //    Program.Volumes.Add(ctx.Guild.Id, level);
+
+                //    using(StreamWriter writer = File.AppendText("volume.txt"))
+                //    {
+                //        writer.WriteLine($"{ctx.Guild.Id} {level}");
+                //    }
+                //}
+            }
+            else
+            {
+                await ctx.FollowUpAsync(ResponseBuilder("Invalid track number."));
+                return;
+            }
+        }
+
+        // HELP BUILDER
+
+        public static DiscordEmbedBuilder HelpBuilder()
+        {
+            return new DiscordEmbedBuilder().WithTitle("Command List")
+                .AddField("Prefix", "You can either use (/) or (bocchi!) to trigger these commands..")
+                .WithDescription("Here are the things you can tell bocchi:")
+                .AddField("\u200B", "\u200B")
+                .AddField("start", "Starts up the player and enables the music related commands")
+                .AddField("\u200B", "\u200B")
+                .AddField("join", "Joins the user's current voice channel.")
+                .AddField("byebye", "Leaves the user's current voice channel.")
+                .AddField("play [song]", "Plays the specified song.")
+                .AddField("playskip [song]", "Plays a song immediately")
+                .AddField("load [playlist]", "Add a playlist to the queue")
+                .AddField("stop", "Stops the music playback and clears the queue.")
+                .AddField("skip", "Skips the current song.")
+                .AddField("skipto [number]", "Skips the specified song number.")
+                .AddField("remove [number]", "Removes an entry from the queue")
+                .AddField("np", "Shows currently playing song.")
+                .AddField("queue [page]", "Shows song queue.")
+                .AddField("resume", "Resumes the current song.")
+                .AddField("pause", "Pauses the current song.")
+                .AddField("loop", "Loops the current song.")
+                .AddField("freeplay", "Never lets the queue run dry.")
+                .AddField("save [url]", "Saves the link as .mp3 then sends it back.")
+                .AddField("rest", "Run this when the player gets tired.")
+                .AddField("volume [number]", "Sets the volume")
+                .AddField("help", "Displays this list.")
+                .AddField("\u200B", "\u200B")
+                .AddField("Others", "Sometimes specific words can trigger a bocchi response..")
+                .AddField("Just be nice to her..", "She's trying her best..")
+                .WithColor(new DiscordColor("#ffd8e1"));
+        }
+
         // SENDING METHODS
 
         private static async Task HiddenSend(string msg, InteractionContext ctx)   //CLASSIC HIDDEN RESPONSE
@@ -1557,7 +1177,7 @@ namespace Alice.Commands
             await ctx.CreateResponseAsync(messageContent);
         }
 
-        private static DiscordFollowupMessageBuilder ResponseBuilder(string msg)  //FOLLOW-UP MESSAGE
+        public static DiscordFollowupMessageBuilder ResponseBuilder(string msg)  //FOLLOW-UP MESSAGE
         {
             return new DiscordFollowupMessageBuilder().WithContent(msg).AsEphemeral(true);
         }

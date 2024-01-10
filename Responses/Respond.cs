@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using Alice_Module.Handlers;
 using ImageMagick;
+using Discord;
 
 namespace Alice.Responses
 {
@@ -89,7 +90,22 @@ namespace Alice.Responses
             if (e.Message.Author.IsBot && e.Message.Author.Username == "Alice")
             {
                 Console.WriteLine("I heard Alice..");
+                if(e.Message.Content.Contains("IP:"))
+                {
+                    Console.WriteLine("She gave me another IP");
+                    var commandPrefix = "IP: ";
+                    var IP = e.Message.Content.Substring(commandPrefix.Length).Trim();
 
+                    if (Program.IPs[e.Guild.Id] == null)
+                    {
+                        Program.IPs.Add(e.Guild.Id, IP);
+                    }
+                    else
+                    {
+                        Program.IPs[e.Guild.Id] = IP;
+                    }
+                    
+                }
                 if (e.Message.Content.Contains("load", StringComparison.OrdinalIgnoreCase))
                 {
                     Console.WriteLine("She said load");
@@ -401,11 +417,11 @@ namespace Alice.Responses
             if (e.Message.Content.Contains("Alice", StringComparison.OrdinalIgnoreCase))
             {
 
-                ulong desiredChannelId = ulong.Parse(Program.doc.Descendants("category")
+                string desiredChannelId = Program.doc.Descendants("category")
                 .FirstOrDefault(category => category.Attribute("name")?.Value == "channel")?
-                .Element("entry").Value);
+                .Element("entry").Value;
 
-                if (e.Message.Channel.Id == desiredChannelId)
+                if (e.Message.Channel.Id.ToString().Equals(desiredChannelId))
                 {
                     string keyword = "Alice";
                     string messageContent = e.Message.Content;

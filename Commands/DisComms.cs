@@ -7,6 +7,7 @@ using RconSharp;
 using Alice_Module.Loaders;
 using System;
 using System.Collections.Generic;
+using Alice_Module.Handlers;
 
 namespace Alice.Commands
 {
@@ -48,7 +49,7 @@ namespace Alice.Commands
             if (loadResult.LoadResultType == LavalinkLoadResultType.LoadFailed || loadResult.LoadResultType == LavalinkLoadResultType.NoMatches)
             {
                 await message.RespondAsync($"Failed to look for {search}");
-                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Failed to look for {search}\",\"color\":\"light_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Failed to look for {search}\",\"color\":\"light_purple\",\"bold\":false}}", guild);
                 return;
             }
 
@@ -64,40 +65,40 @@ namespace Alice.Commands
                     {
                         if (SlashComms._queueDictionary.ContainsKey(guild.Id))
                         {
-                            SlashComms._queueDictionary[guild.Id].Add(track);
+                            SlashComms._queueDictionary[guild.Id].Add(new song(track, "Alice"));
                         }
                         else
                         {
-                            SlashComms._queueDictionary.Add(guild.Id, new List<LavalinkTrack>());
+                            SlashComms._queueDictionary.Add(guild.Id, new List<song>());
                             await Task.Delay(100);
-                            SlashComms._queueDictionary[guild.Id].Add(track);
+                            SlashComms._queueDictionary[guild.Id].Add(new song(track, "Alice"));
                         }
                         Program.skipped = true;
                         await conn.PlayAsync(track);
                         Program.skipped = false;
 
                         await message.RespondAsync($"Now Playing: {track.Title}");
-                        await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Now Playing - {track.Title}\",\"color\":\"light_purple\",\"bold\":false}}");
+                        await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Now Playing - {track.Title}\",\"color\":\"light_purple\",\"bold\":false}}", guild);
                         return;
                     }
                     else
                     {
                         if (SlashComms._queueDictionary.ContainsKey(guild.Id))
                         {
-                            SlashComms._queueDictionary[guild.Id].Add(track);
+                            SlashComms._queueDictionary[guild.Id].Add(new song(track, "Alice"));
                         }
                         else
                         {
-                            SlashComms._queueDictionary.Add(guild.Id, new List<LavalinkTrack>());
+                            SlashComms._queueDictionary.Add(guild.Id, new List<song>());
                             await Task.Delay(100);
-                            SlashComms._queueDictionary[guild.Id].Add(track);
+                            SlashComms._queueDictionary[guild.Id].Add(new song(track, "Alice"));
                         }
                         Program.skipped = true;
                         await conn.PlayAsync(track);
                         Program.skipped = false;
 
                         await message.RespondAsync($"Sigh, guess I'll let myself in..\n \nNow Playing: {track.Title}");
-                        await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Now Playing - {track.Title}\",\"color\":\"light_purple\",\"bold\":false}}");
+                        await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Now Playing - {track.Title}\",\"color\":\"light_purple\",\"bold\":false}}", guild);
                         return;
                     }
                 }
@@ -106,7 +107,7 @@ namespace Alice.Commands
                     if (SlashComms._queueDictionary[guild.Id].Count >= SlashComms.MaxQueueSize)
                     {
                         await message.RespondAsync($"Max queue length was set to {SlashComms.MaxQueueSize}, wait for songs to finish");
-                        await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Max queue length was set to {SlashComms.MaxQueueSize}, wait for songs to finish\",\"color\":\"light_purple\",\"bold\":false}}");
+                        await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Max queue length was set to {SlashComms.MaxQueueSize}, wait for songs to finish\",\"color\":\"light_purple\",\"bold\":false}}", guild);
                         return;
                     }
                     else
@@ -114,17 +115,17 @@ namespace Alice.Commands
                         // Add the track to the song queue
                         if (SlashComms._queueDictionary.ContainsKey(guild.Id))
                         {
-                            SlashComms._queueDictionary[guild.Id].Add(track);
+                            SlashComms._queueDictionary[guild.Id].Add(new song(track, "Alice"));
                         }
                         else
                         {
-                            SlashComms._queueDictionary.Add(guild.Id, new List<LavalinkTrack>());
+                            SlashComms._queueDictionary.Add(guild.Id, new List<song>());
                             await Task.Delay(100);
-                            SlashComms._queueDictionary[guild.Id].Add(track);
+                            SlashComms._queueDictionary[guild.Id].Add(new song(track, "Alice"));
                         }
 
                         await message.RespondAsync($"Added to Queue: {track.Title}");
-                        await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Added to Queue - {track.Title}..\",\"color\":\"light_purple\",\"bold\":false}}");
+                        await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Added to Queue - {track.Title}..\",\"color\":\"light_purple\",\"bold\":false}}", guild);
                         return;
                     }
                 }
@@ -132,7 +133,7 @@ namespace Alice.Commands
             catch
             {
                 await message.RespondAsync($"{track.Title} failed to play");
-                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: {track.Title} failed to play\",\"color\":\"light_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: {track.Title} failed to play\",\"color\":\"light_purple\",\"bold\":false}}", guild);
                 return;
             }
         }
@@ -150,7 +151,7 @@ namespace Alice.Commands
             if (SlashComms._queueDictionary[guild.Id].Count < 1)
             {
                 await message.RespondAsync("Buddy, there's no song to skip to..");
-                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Buddy, there's no song to skip to..\",\"color\":\"light_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Buddy, there's no song to skip to..\",\"color\":\"light_purple\",\"bold\":false}}", guild);
                 return;
             }
 
@@ -162,21 +163,21 @@ namespace Alice.Commands
             if (conn.CurrentState.CurrentTrack != null)
             {
                 var nextTrack = SlashComms._queueDictionary[guild.Id][1];
-                var nextTrackTitle = nextTrack.Title;
+                var nextTrackTitle = nextTrack.getTrack().Title;
                 var track = SlashComms._queueDictionary[guild.Id][0];
-                var trackTitle = track.Title;
+                var trackTitle = track.getTrack().Title;
                 Program.skipped = true;
-                await conn.PlayAsync(nextTrack);
+                await conn.PlayAsync(nextTrack.getTrack());
                 SlashComms._queueDictionary[guild.Id].RemoveAt(0);
                 Program.skipped = false;
 
                 await message.RespondAsync($"Skipped {trackTitle}, now playing {nextTrackTitle}..");
-                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Skipped {trackTitle}, now playing {nextTrackTitle}..\",\"color\":\"light_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Skipped {trackTitle}, now playing {nextTrackTitle}..\",\"color\":\"light_purple\",\"bold\":false}}", guild);
             }
             else
             {
                 await message.RespondAsync("Buddy, there's no song to skip to..");
-                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Buddy, there's no song to skip to..\",\"color\":\"light_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Buddy, there's no song to skip to..\",\"color\":\"light_purple\",\"bold\":false}}", guild);
             }
         }
 
@@ -206,12 +207,12 @@ namespace Alice.Commands
                 var currentTrack = conn.CurrentState.CurrentTrack;
                 var trackInfo = $"{currentTrack.Title} {currentTrack.Length}";
                 await message.RespondAsync($"{currentTrack.Title} {currentTrack.Length}");
-                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: {currentTrack.Title} {currentTrack.Length}\",\"color\":\"light_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: {currentTrack.Title} {currentTrack.Length}\",\"color\":\"light_purple\",\"bold\":false}}", guild);
             }
             else
             {
                 await message.RespondAsync("Nothing but silence..");
-                await RconSend("/tellraw @a {\"text\":\"Bocchi: Nothing but silence..\",\"color\":\"light_purple\",\"bold\":false}");
+                await RconSend("/tellraw @a {\"text\":\"Bocchi: Nothing but silence..\",\"color\":\"light_purple\",\"bold\":false}", guild);
             }
         }
 
@@ -220,15 +221,15 @@ namespace Alice.Commands
         {
             if (SlashComms._queueDictionary[guild.Id].Count == 0)
             {
-                await RconSend("/tellraw @a {\"text\":\"Bocchi: The queue list is blank..\",\"color\":\"light_purple\",\"bold\":false}");
+                await RconSend("/tellraw @a {\"text\":\"Bocchi: The queue list is blank..\",\"color\":\"light_purple\",\"bold\":false}", guild);
             }
             else
             {
-                await RconSend("/tellraw @a {\"text\":\"Bocchi: Look at all these songs:\",\"color\":\"light_purple\",\"bold\":false}");
+                await RconSend("/tellraw @a {\"text\":\"Bocchi: Look at all these songs:\",\"color\":\"light_purple\",\"bold\":false}", guild);
                 var queueContent = string.Join("\n", SlashComms._queueDictionary[guild.Id].Select((track, index) =>
                 {
                     var prefix = (index == 0) ? "【Now Playing】 " : string.Empty;
-                    return $"{index + 1}. {prefix}{track.Title}";
+                    return $"{index + 1}. {prefix}{track.getTrack().Title}";
                 }));
 
                 var lines = queueContent.Split('\n');
@@ -236,7 +237,7 @@ namespace Alice.Commands
                 foreach (var line in lines)
                 {
                     var trimmedLine = line.Length <= 50 ? line : line.Substring(0, 50);
-                    await RconSend($"/tellraw @a {{\"text\":\"{trimmedLine}\",\"color\":\"dark_purple\",\"bold\":false}}");
+                    await RconSend($"/tellraw @a {{\"text\":\"{trimmedLine}\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
                 }
             }
 
@@ -278,7 +279,7 @@ namespace Alice.Commands
             if (loadResult.LoadResultType == LavalinkLoadResultType.LoadFailed || loadResult.LoadResultType == LavalinkLoadResultType.NoMatches)
             {
                 await message.RespondAsync($"Failed to look for {search}");
-                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Failed to look for {search}\",\"color\":\"light_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Failed to look for {search}\",\"color\":\"light_purple\",\"bold\":false}}", guild);
                 return;
             }
 
@@ -290,31 +291,31 @@ namespace Alice.Commands
                 Program.skipped = true;
                 if (SlashComms._queueDictionary.ContainsKey(guild.Id))
                 {
-                    SlashComms._queueDictionary[guild.Id].Insert(0, track);
+                    SlashComms._queueDictionary[guild.Id].Insert(0, new song(track, "Alice"));
                     SlashComms._queueDictionary[guild.Id].RemoveAt(1);
                     await conn.PlayAsync(track);
 
                     await message.RespondAsync($"Found it. Now Playing: {track.Title}");
-                    await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Found it. Now Playing - {track.Title}\",\"color\":\"light_purple\",\"bold\":false}}");
+                    await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Found it. Now Playing - {track.Title}\",\"color\":\"light_purple\",\"bold\":false}}", guild);
                     Program.skipped = false;
                 }
                 else
                 {
-                    SlashComms._queueDictionary.Add(guild.Id, new List<LavalinkTrack>());
+                    SlashComms._queueDictionary.Add(guild.Id, new List<song>());
                     await Task.Delay(100);
-                    SlashComms._queueDictionary[guild.Id].Insert(0, track);
+                    SlashComms._queueDictionary[guild.Id].Insert(0, new song(track, "Alice"));
                     SlashComms._queueDictionary[guild.Id].RemoveAt(1);
                     await conn.PlayAsync(track);
 
                     await message.RespondAsync($"Found it. Now Playing: {track.Title}");
-                    await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Found it. Now Playing - {track.Title}\",\"color\":\"light_purple\",\"bold\":false}}");
+                    await RconSend($"/tellraw @a {{\"text\":\"Bocchi: Found it. Now Playing - {track.Title}\",\"color\":\"light_purple\",\"bold\":false}}", guild);
                     Program.skipped = false;
                 }
             }
             catch
             {
                 await message.RespondAsync($"{track.Title} failed to play");
-                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: {track.Title} failed to play..\",\"color\":\"light_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Bocchi: {track.Title} failed to play..\",\"color\":\"light_purple\",\"bold\":false}}", guild);
             }
         }
 
@@ -332,14 +333,14 @@ namespace Alice.Commands
             {
                 //songTitles = await PlayLoader.SpotifyLoaderAsync(list);
                 await message.RespondAsync("Sean-san is not a Spotify Developer yet so I don't have support for Spotify links at the moment..");
-                await RconSend($"/tellraw @a {{\"text\":\"Alice: Sean-san is not a Spotify Developer yet so I don't have support for Spotify links at the moment..\",\"color\":\"dark_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Alice: Sean-san is not a Spotify Developer yet so I don't have support for Spotify links at the moment..\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
 
                 return;
             }
             else
             {
                 await message.RespondAsync("Invalid playlist link.");
-                await RconSend($"/tellraw @a {{\"text\":\"Alice: Invalid playlist link.\",\"color\":\"dark_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Alice: Invalid playlist link.\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
                 return;
             }
 
@@ -354,7 +355,7 @@ namespace Alice.Commands
                 if (PlayLoader._queuefull == true)
                 {
                     await message.RespondAsync("Playlist loaded.");
-                    await RconSend($"/tellraw @a {{\"text\":\"Alice: Playlist Loaded..\",\"color\":\"dark_purple\",\"bold\":false}}");
+                    await RconSend($"/tellraw @a {{\"text\":\"Alice: Playlist Loaded..\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
                     PlayLoader._queuefull = false;
                     break;
                 }
@@ -365,7 +366,7 @@ namespace Alice.Commands
             if (PlayLoader._queuefull != true)
             {
                 await message.RespondAsync("Playlist loaded.");
-                await RconSend($"/tellraw @a {{\"text\":\"Alice: Playlist Loaded..\",\"color\":\"dark_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Alice: Playlist Loaded..\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
             }
         }
 
@@ -378,13 +379,13 @@ namespace Alice.Commands
             if (SlashComms._ready == false)
             {
                 await message.RespondAsync("She's not ready yet, make sure she's settled in a vc already before you execute ingame commands..");
-                await RconSend($"/tellraw @a {{\"text\":\"Alice: She's not ready yet, make sure she's settled in a vc already before you execute ingame commands..\",\"color\":\"dark_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Alice: She's not ready yet, make sure she's settled in a vc already before you execute ingame commands..\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
             }
 
             if (SlashComms._lavastarted == false)                                                                    // LAVALINK CHECK
             {
                 await message.RespondAsync("Please execute /start first so I can boot up the music player..");
-                await RconSend($"/tellraw @a {{\"text\":\"Alice: The player is not started..\",\"color\":\"dark_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Alice: The player is not started..\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
 
                 return;
             }
@@ -392,7 +393,7 @@ namespace Alice.Commands
             if (!lava.ConnectedNodes.Any())
             {
                 await message.RespondAsync("Lavalink not connected.");
-                await RconSend($"/tellraw @a {{\"text\":\"Alice: Sean-san send help pls..\",\"color\":\"dark_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Alice: Sean-san send help pls..\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
 
                 return;
             }
@@ -417,27 +418,27 @@ namespace Alice.Commands
                     {
                         if (SlashComms._queueDictionary.ContainsKey(guild.Id))
                         {
-                            SlashComms._queueDictionary[guild.Id].Add(track);
+                            SlashComms._queueDictionary[guild.Id].Add(new song(track, "Alice"));
                             Program.skipped = true;
                             await conn.PlayAsync(track);
 
                             await message.RespondAsync($"Loading Playlist.. \n \nNow Playing: {track.Title}");
-                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Loading Playlist..\",\"color\":\"dark_purple\",\"bold\":false}}");
-                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Now Playing: {track.Title}\",\"color\":\"dark_purple\",\"bold\":false}}");
+                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Loading Playlist..\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
+                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Now Playing: {track.Title}\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
 
                             Program.skipped = false;
                         }
                         else
                         {
-                            SlashComms._queueDictionary.Add(guild.Id, new List<LavalinkTrack>());
+                            SlashComms._queueDictionary.Add(guild.Id, new List<song>());
                             await Task.Delay(100);
-                            SlashComms._queueDictionary[guild.Id].Add(track);
+                            SlashComms._queueDictionary[guild.Id].Add(new song(track, "Alice"));
                             Program.skipped = true;
                             await conn.PlayAsync(track);
 
                             await message.RespondAsync($"Loading Playlist.. \n \nNow Playing: {track.Title}");
-                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Loading Playlist..\",\"color\":\"dark_purple\",\"bold\":false}}");
-                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Now Playing: {track.Title}\",\"color\":\"dark_purple\",\"bold\":false}}");
+                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Loading Playlist..\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
+                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Now Playing: {track.Title}\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
 
                             Program.skipped = false;
                         }
@@ -446,26 +447,26 @@ namespace Alice.Commands
                     {
                         if (SlashComms._queueDictionary.ContainsKey(guild.Id))
                         {
-                            SlashComms._queueDictionary[guild.Id].Add(track);
+                            SlashComms._queueDictionary[guild.Id].Add(new song(track, "Alice"));
                             Program.skipped = true;
                             await conn.PlayAsync(track);
 
                             await message.RespondAsync($"Loading Playlist.. \n \nNow Playing: {track.Title}");
-                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Loading Playlist..\",\"color\":\"dark_purple\",\"bold\":false}}");
-                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Now Playing: {track.Title}\",\"color\":\"dark_purple\",\"bold\":false}}");
+                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Loading Playlist..\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
+                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Now Playing: {track.Title}\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
                             Program.skipped = false;
                         }
                         else
                         {
-                            SlashComms._queueDictionary.Add(guild.Id, new List<LavalinkTrack>());
+                            SlashComms._queueDictionary.Add(guild.Id, new List<song>());
                             await Task.Delay(100);
-                            SlashComms._queueDictionary[guild.Id].Add(track);
+                            SlashComms._queueDictionary[guild.Id].Add(new song(track, "Alice"));
                             Program.skipped = true;
                             await conn.PlayAsync(track);
 
                             await message.RespondAsync($"Loading Playlist.. \n \nNow Playing: {track.Title}");
-                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Loading Playlist..\",\"color\":\"dark_purple\",\"bold\":false}}");
-                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Now Playing: {track.Title}\",\"color\":\"dark_purple\",\"bold\":false}}");
+                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Loading Playlist..\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
+                            await RconSend($"/tellraw @a {{\"text\":\"Alice: Now Playing: {track.Title}\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
                             Program.skipped = false;
                         }
                     }
@@ -479,25 +480,26 @@ namespace Alice.Commands
                     }
                     else
                     {
-                        SlashComms._queueDictionary[guild.Id].Add(track);
+                        SlashComms._queueDictionary[guild.Id].Add(new song(track, "Alice"));
                     }
                 }
             }
             catch
             {
                 await message.RespondAsync($"{track.Title} failed to play");
-                await RconSend($"/tellraw @a {{\"text\":\"Alice: Failed to play {track.Title}..\",\"color\":\"dark_purple\",\"bold\":false}}");
+                await RconSend($"/tellraw @a {{\"text\":\"Alice: Failed to play {track.Title}..\",\"color\":\"dark_purple\",\"bold\":false}}", guild);
             }
         }
 
         // SERVER MESSAGING SERVICE
-        public static async Task RconSend(string message)
+        public static async Task RconSend(string message, DiscordGuild guild)
         {
             try
             {
-                string serverIp = Program.doc.Descendants("category")
-                .FirstOrDefault(category => category.Attribute("name")?.Value == "sIP")?
-                .Element("entry").Value;
+                //string serverIp = Program.doc.Descendants("category")
+                //.FirstOrDefault(category => category.Attribute("name")?.Value == "sIP")?
+                //.Element("entry").Value;
+                string serverIp = Program.IPs[guild.Id];
                 
                 int serverPort = int.Parse(Program.doc.Descendants("category")
                 .FirstOrDefault(category => category.Attribute("name")?.Value == "sPort")?

@@ -12,29 +12,42 @@ using DSharpPlus.Lavalink.EventArgs;
 using DSharpPlus.CommandsNext;
 using Alice.Commands;
 using Alice.Responses;
+using Alice_Module.Loaders;
 using System.Xml.Linq;
 using System.Diagnostics;
 using System.Threading;
 using System.Collections.Generic;
+using YoutubeExplode;
+using YoutubeExplode.Common;
 
 namespace Alice
 {
     class Program
     {
         public static string Alice;
-        public static bool skipped = false;
-        public static List<ulong> loop = new List<ulong>();
         public static string prefix;
+
+        public static bool skipped = false; //TO BE UPDATED, CURRENTLY NOT CONCURRENT COMPAT
+
+        public static List<ulong> loop = new List<ulong>();
+        public static List<ulong> freeplaylist = new List<ulong>();
+        public static List<ulong> reconlist = new List<ulong>();
+        public static Dictionary<ulong, string> IPs = new Dictionary<ulong, string>();
+        //public static Dictionary<ulong, int> Volumes = new Dictionary<ulong, int>();
+        
         public static Process lavalinkProcess;
         public static CommandsNextConfiguration commandsConfig;
         public static DiscordClient discord;
-        public static XDocument doc = XDocument.Load("data.xml");
         private static Timer disconnectionTimer;
+
+        public static XDocument doc = XDocument.Load("data.xml");
         public static XElement tokenElement;
         public static XElement username;
+
         public static string User, Token, Prefix;
-        public static bool forcestop = false;
-        public static bool unbroken = false;
+
+        public static bool forcestop = false; //TO BE UPDATED, CURRENTLY NOT CONCURRENT COMPAT
+        public static bool unbroken = false; //TO BE UPDATED, CURRENTLY NOT CONCURRENT COMPAT
 
         static async Task Main(string[] args)
         {
@@ -64,7 +77,6 @@ namespace Alice
                 Prefix = "prefix";
                 User = "username";
             }
-
 
             tokenElement = doc.Descendants("category")
                 .FirstOrDefault(category => category.Attribute("name")?.Value == Token)?
@@ -120,7 +132,7 @@ namespace Alice
 
                 //Connection Methods
                 await discord.ConnectAsync();
-
+                
                 //Twenty Four Seven
                 await Task.Delay(-1);
             }
@@ -143,13 +155,85 @@ namespace Alice
 
         public static async Task PlaybackFinishedHandler(LavalinkGuildConnection sender, TrackFinishEventArgs e)
         {
+            ulong guild = sender.Guild.Id;
+
             if (skipped == true)
             {
-                return;
+                if(!freeplaylist.Contains(guild))
+                {
+                    return;
+                }
             }
             else
             {
-                ulong guild = sender.Guild.Id;
+                if (freeplaylist.Contains(guild) && !reconlist.Contains(guild))
+                {
+                    Console.WriteLine("FREE BIRD YEAHH..");
+                    await sender.Channel.SendMessageAsync("Hmmm.. let me see here..");
+                    var youtube = new YoutubeClient();
+
+                    //GET ORIGINAL VIDEO
+                    var videos = await youtube.Search.GetPlaylistsAsync(SlashComms._queueDictionary[guild][0].getTrack().Title + " " + SlashComms._queueDictionary[guild][0].getTrack().Author);
+
+                    //GET PLAYLIST
+                    if (videos.Count > 0)
+                    {
+                        Random random = new Random();
+                        int randomIndex = random.Next(0, videos.Count);
+
+                        var songTitles = await PlayLoader.YoutubeLoaderAsync(videos[randomIndex].Url);
+
+                        if (songTitles == null || songTitles.Count == 0)
+                        {
+                            await sender.Channel.SendMessageAsync("No song titles found in the playlist.");
+                            return;
+                        }
+
+                        await sender.Channel.SendMessageAsync("Loading Playlist..");
+                        var progressMessage = await sender.Channel.SendMessageAsync("_ songs queue'd..");
+                        int songCount = 0;
+
+                        foreach (string title in songTitles)
+                        {
+                            Program.unbroken = true;
+
+                            if (PlayLoader._queuefull == true)
+                            {
+                                PlayLoader._queuefull = false;
+                                break;
+                            }
+
+                            if (Program.forcestop == true)
+                            {
+                                Program.unbroken = false;
+                                break;
+                            }
+
+                            if (songCount > 9)
+                            {
+                                break;
+                            }
+
+                            ++songCount;
+
+                            await PlayLoader.FreeEnqueue(sender, title);
+                            await progressMessage.ModifyAsync($"{songCount} songs queue'd..");
+                        }
+
+                        await progressMessage.ModifyAsync("Playlist loaded.");
+                        Console.WriteLine("Theoretically, it should be playing..");
+                        SlashComms._queueDictionary[guild].RemoveAt(0);
+                        reconlist.Add(guild);
+                    }
+                    else
+                    {
+                        await sender.Channel.SendMessageAsync("I can't think of a next song to recommend..");
+                        Console.WriteLine("Could not get playlist");
+                        SlashComms._queueDictionary[guild].RemoveAt(0);
+                    }
+
+                    return;
+                }
 
                 if (SlashComms._queueDictionary[guild] != null)
                 {
@@ -159,7 +243,7 @@ namespace Alice
                         {
                             var loopTrack = SlashComms._queueDictionary[guild][0];
                             skipped = true;
-                            await sender.PlayAsync(loopTrack);
+                            await sender.PlayAsync(loopTrack.getTrack());
                             skipped = false;
                         }
                         else
@@ -177,12 +261,18 @@ namespace Alice
                             else
                             {
                                 var nextTrack = SlashComms._queueDictionary[guild][1];
+
+                                if (SlashComms._queueDictionary[guild].Count == 2 && freeplaylist.Contains(guild))
+                                {
+                                    reconlist.Remove(guild);
+                                }
+
                                 SlashComms._queueDictionary[guild].RemoveAt(0);
 
                                 try
                                 {
                                     skipped = true;
-                                    await sender.PlayAsync(nextTrack);
+                                    await sender.PlayAsync(nextTrack.getTrack());
 
                                     if (SlashComms._queueDictionary.Count > 1)
                                     {
@@ -191,14 +281,14 @@ namespace Alice
                                     }
                                     else
                                     {
-                                        await Program.UpdateUserStatus(discord, "LISTENING", $"{nextTrack.Title} {nextTrack.Author}");
-                                        Console.WriteLine($"NOW PLAYING: {nextTrack.Title} {nextTrack.Author}");
+                                        await Program.UpdateUserStatus(discord, "LISTENING", $"{nextTrack.getTrack().Title} {nextTrack.getTrack().Author}");
+                                        Console.WriteLine($"NOW PLAYING: {nextTrack.getTrack().Title} {nextTrack.getTrack().Author}");
                                     }
                                     skipped = false;
                                 }
                                 catch
                                 {
-                                    await RetryAsync(sender, nextTrack);
+                                    await RetryAsync(sender, nextTrack.getTrack());
                                 }
                             }
                         }
@@ -271,8 +361,8 @@ namespace Alice
                                 var currentTrack = remainingList[0];
 
                                 Console.WriteLine("PLAYER IS PLAYING");
-                                Console.WriteLine($"NOW PLAYING: {currentTrack.Title} {currentTrack.Author}");
-                                await Program.UpdateUserStatus(client, "LISTENING", $"{currentTrack.Title} {currentTrack.Author}");
+                                Console.WriteLine($"NOW PLAYING: {currentTrack.getTrack().Title} {currentTrack.getTrack().Author}");
+                                await Program.UpdateUserStatus(client, "LISTENING", $"{currentTrack.getTrack().Title} {currentTrack.getTrack().Author}");
                             }
                             
                         }
@@ -301,6 +391,12 @@ namespace Alice
 
                     await Task.Delay(10);
 
+                    if(SlashComms._queueDictionary.Count > 0)
+                    {
+                        Console.WriteLine("Disconnected, Keeping alive.");
+                        return;
+                    }
+
                     disconnectionTimer = new Timer(TimerCallback, null, TimeSpan.FromSeconds(15), Timeout.InfiniteTimeSpan);
                     Console.WriteLine("Timer Started");
                 }
@@ -321,8 +417,8 @@ namespace Alice
                             else if (SlashComms._queueDictionary.Count == 1)
                             {
                                 Console.WriteLine("PLAYER IS PLAYING");
-                                Console.WriteLine($"NOW PLAYING: {currentTrack.Title} {currentTrack.Author}");
-                                await Program.UpdateUserStatus(client, "LISTENING", $"{currentTrack.Title} {currentTrack.Author}");
+                                Console.WriteLine($"NOW PLAYING: {currentTrack.getTrack().Title} {currentTrack.getTrack().Author}");
+                                await Program.UpdateUserStatus(client, "LISTENING", $"{currentTrack.getTrack().Title} {currentTrack.getTrack().Author}");
                             }
                             else
                             {
@@ -378,7 +474,7 @@ namespace Alice
 
             RemoveDisconnectionTimer();
             Console.WriteLine("Timer Ended");
-        }
+        } //POTENTIAL SOURCE OF RANDOM "STATE" ERROR
 
         private static void RemoveDisconnectionTimer()
         {
