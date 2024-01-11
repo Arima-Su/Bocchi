@@ -11,8 +11,7 @@ using Alice.Commands;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using Alice_Module.Handlers;
-using ImageMagick;
-using Discord;
+using SkiaSharp;
 
 namespace Alice.Responses
 {
@@ -515,31 +514,37 @@ namespace Alice.Responses
                 {
                     if (Program.username.Value == "Bocchi")
                     {
+                        var file = SKBitmap.Decode(Path.Combine("assets", "bocchinn.png"));
+                        var cooledfile = Path.Combine("assets", "bocchinn_cooled.png");
+
                         try
                         {
-                            if (index != -1)
+                            using (var surface = SKSurface.Create(new SKImageInfo(file.Width, file.Height)))
                             {
-                                var file = Path.Combine("assets", "bocchinn.png");
-                                string cooledfile;
-
-                                using (var image = new MagickImage(file))
+                                using (SKCanvas canvas = surface.Canvas)
                                 {
-                                    // Create drawables for text
-                                    var drawable = new Drawables()
-                                        .Font("unispace.ttf", FontStyleType.Normal, FontWeight.Normal, FontStretch.Normal)
-                                        .FontPointSize(46)             // Set font size
-                                        .FillColor(MagickColors.Gold) // Set text color
-                                        .Text(340, 746, extractedText); // Specify text and position
+                                    canvas.DrawBitmap(file, 0, 0);
 
-                                    // Annotate the image with the text
-                                    image.Draw(drawable);
+                                    using (SKPaint paint = new SKPaint())
+                                    {
+                                        paint.Color = SKColors.Gold;
+                                        paint.TextSize = 40.0f;
+                                        paint.Typeface = SKTypeface.FromFile("unispace.ttf");
+                                        var point = new SKPoint(340, 746);
+                                        canvas.DrawText(extractedText, point, paint);
+                                    }
 
-                                    cooledfile = Path.Combine("assets", "bocchinn_cooled.png");
-                                    image.Write(cooledfile);
                                 }
 
-                                await save.SendSilentAsync(e.Channel.Id, cooledfile);
+                                using (var coolfile = surface.Snapshot())
+                                using (var data = coolfile.Encode(SKEncodedImageFormat.Png, 100))
+                                using (var stream = File.OpenWrite(cooledfile))
+                                {
+                                    data.SaveTo(stream);
+                                }
                             }
+
+                            await save.SendSilentAsync(e.Channel.Id, cooledfile);
                         }
                         catch (Exception ex)
                         {
@@ -550,31 +555,37 @@ namespace Alice.Responses
 
                     if (Program.username.Value == "Cirno")
                     {
+                        var file = SKBitmap.Decode(Path.Combine("assets", "chirumiru.png"));
+                        var cooledfile = Path.Combine("assets", "chirumiru_cooled.png");
+
                         try
                         {
-                            if (index != -1)
+                            using (var surface = SKSurface.Create(new SKImageInfo(file.Width, file.Height)))
                             {
-                                var file = Path.Combine("assets", "chirumiru.png");
-                                string cooledfile;
-
-                                using (var image = new MagickImage(file))
+                                using (SKCanvas canvas = surface.Canvas)
                                 {
-                                    // Create drawables for text
-                                    var drawable = new Drawables()
-                                        .Font("unispace.ttf", FontStyleType.Normal, FontWeight.Normal, FontStretch.Normal)
-                                        .FontPointSize(46)             // Set font size
-                                        .FillColor(MagickColors.Gold) // Set text color
-                                        .Text(370, 766, extractedText); // Specify text and position
+                                    canvas.DrawBitmap(file, 0, 0);
 
-                                    // Annotate the image with the text
-                                    image.Draw(drawable);
+                                    using (SKPaint paint = new SKPaint())
+                                    {
+                                        paint.Color = SKColors.Gold;
+                                        paint.TextSize = 40.0f;
+                                        paint.Typeface = SKTypeface.FromFile("unispace.ttf");
+                                        var point = new SKPoint(340, 746);
+                                        canvas.DrawText(extractedText, point, paint);
+                                    }
 
-                                    cooledfile = Path.Combine("assets", "chirumiru_cooled.png");
-                                    image.Write(cooledfile);
                                 }
 
-                                await save.SendSilentAsync(e.Channel.Id, cooledfile);
+                                using (var coolfile = surface.Snapshot())
+                                using (var data = coolfile.Encode(SKEncodedImageFormat.Png, 100))
+                                using (var stream = File.OpenWrite(cooledfile))
+                                {
+                                    data.SaveTo(stream);
+                                }
                             }
+
+                            await save.SendSilentAsync(e.Channel.Id, cooledfile);
                         }
                         catch (Exception ex)
                         {

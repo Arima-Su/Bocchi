@@ -33,7 +33,6 @@ namespace Alice
         public static List<ulong> freeplaylist = new List<ulong>();
         public static List<ulong> reconlist = new List<ulong>();
         public static Dictionary<ulong, string> IPs = new Dictionary<ulong, string>();
-        //public static Dictionary<ulong, int> Volumes = new Dictionary<ulong, int>();
         
         public static Process lavalinkProcess;
         public static CommandsNextConfiguration commandsConfig;

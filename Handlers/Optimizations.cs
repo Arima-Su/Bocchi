@@ -332,17 +332,6 @@ namespace Alice_Module.Handlers
         {
             var guild = ctx.Guild.Id;
 
-            //if(Program.Volumes.ContainsKey(guild))
-            //{
-            //    await conn.SetVolumeAsync(Program.Volumes[guild]);
-            //}
-            //else
-            //{
-            //    await conn.SetVolumeAsync(50);
-            //}
-
-            //await conn.SetVolumeAsync(50);
-
             try
             {
                 if (conn.CurrentState.CurrentTrack == null || skip)
