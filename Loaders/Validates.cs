@@ -32,5 +32,29 @@
             // Check if the link contains "spotify.com" and "playlist/" (common pattern for Spotify playlists)
             return link.Contains("spotify.com") && link.Contains("track/");
         }
+
+        public static bool HasOperation(char msg)
+        {
+            if (msg == '+' || msg == '-' || msg == '*' || msg == '/' || msg == '(' || msg == ')')
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        public static bool HasOperation(string msg)
+        {
+            if (msg.Contains("+") || msg.Contains("-") || msg.Contains("*") || msg.Contains("/") || msg.Contains("(") || msg.Contains(")"))
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
     }
 }

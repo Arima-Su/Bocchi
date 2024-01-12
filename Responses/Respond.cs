@@ -12,6 +12,11 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using Alice_Module.Handlers;
 using SkiaSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
+using Alice_Module.Loaders;
+using NCalc;
+using System.Linq.Expressions;
 
 namespace Alice.Responses
 {
@@ -622,6 +627,220 @@ namespace Alice.Responses
                     return;
                 }
             }
+
+            if (e.Message.Content.Contains("Photocopy", StringComparison.OrdinalIgnoreCase) && e.Message.Content.Contains("Bocchi", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("Alright, let me get the printer..");
+
+                if (e.Message.Attachments.Count > 0)
+                {
+                    foreach (var attachments in e.Message.Attachments)
+                    {
+                        if (attachments.FileName.EndsWith(".png") || attachments.FileName.EndsWith(".jpg") || attachments.FileName.EndsWith(".jpeg"))
+                        {
+                            await e.Channel.SendMessageAsync("Alright, let me get the printer..");
+
+                            var printedfile = Path.Combine("assets", "printedfile.png");
+                            var coolprinterfile = Path.Combine("assets", "coolprintedfile.png");
+
+                            try
+                            {
+                                using (var httpClient = new HttpClient())
+                                {
+                                    using (var attachStream = await httpClient.GetStreamAsync(attachments.Url))
+                                    {
+                                        using (var fileStream = File.Create(printedfile))
+                                        {
+                                            await attachStream.CopyToAsync(fileStream);
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                await e.Channel.SendMessageAsync($"Printer error: {ex}");
+                                return;
+                            }
+
+                            try
+                            {
+                                using (var image = Image.Load(printedfile))
+                                {
+                                    image.Mutate(x => x.Grayscale());
+
+                                    image.Mutate(x => x.BinaryThreshold(0.42f));
+
+                                    image.Save(coolprinterfile);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                await e.Channel.SendMessageAsync($"Scanner error: {ex}");
+                                return;
+                            }
+
+                            await save.SendSilentAsync(e.Channel.Id, coolprinterfile);
+                            await e.Channel.SendMessageAsync("Here you go..");
+                        }
+                        else
+                        {
+                            await e.Message.Channel.SendMessageAsync("The printer only accepts images..");
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    await e.Message.Channel.SendMessageAsync("Photocopy *what* exactly?");
+                }
+            }
+
+            if (e.Message.Content.Contains("solve", StringComparison.OrdinalIgnoreCase) && e.Message.Content.Any(char.IsDigit) && Validates.HasOperation(e.Message.Content))
+            {
+                try
+                {
+                    int start = -1;
+                    int end = -1;
+
+                    for (int i = 0; i < e.Message.Content.Length; i++)
+                    {
+                        if (char.IsDigit(e.Message.Content[i]))
+                        {
+                            start = i;
+                            for (int j = i; j < e.Message.Content.Length; j++)
+                            {
+                                if ((char.IsDigit(e.Message.Content[j])) || Validates.HasOperation(e.Message.Content[j]))
+                                {
+                                    end = j + 1;
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    }
+
+                    if (start < 0 || end < 0)
+                    {
+                        await e.Message.Channel.SendMessageAsync($"well this is wack..");
+                        return;
+                    }
+
+                    Console.WriteLine($"String: {e.Message.Content.Length}, Start: {start}, End: {end}");
+                    var math = e.Message.Content.Substring(start, end - start);
+                    Console.WriteLine($"{math.Trim()} huh..");
+                    var expression = new NCalc.Expression(math).Evaluate();
+
+                    await e.Message.Channel.SendMessageAsync($"I think the answer is: {expression}");
+                }
+                catch (Exception ex)
+                {
+                    await e.Message.Channel.SendMessageAsync($"{GetRandomEntry("Nanis")} Your math is not mathing bro.. ");
+                    Console.WriteLine(ex);
+                }
+            }
+
+            #region Cursed Image Generator
+            //if (e.Message.Content.Contains("Photocopy", StringComparison.OrdinalIgnoreCase))
+            //{
+            //    Console.WriteLine("Alright, let me get the printer..");
+
+            //    if (e.Message.Attachments.Count > 0)
+            //    {
+            //        foreach (var attachments in e.Message.Attachments)
+            //        {
+            //            if (attachments.FileName.EndsWith(".png") || attachments.FileName.EndsWith(".jpg") || attachments.FileName.EndsWith(".jpeg"))
+            //            {
+            //                await e.Channel.SendMessageAsync("Alright, let me get the printer..");
+
+            //                //Stream attachStream;
+            //                SKBitmap file;
+            //                var printedfile = Path.Combine("assets", "printedfile.png");
+            //                var coolprinterfile = Path.Combine("assets", "coolprintedfile.png");
+
+            //                try
+            //                {
+            //                    using (var httpClient = new HttpClient())
+            //                    {
+            //                        //attachStream = await httpClient.GetStreamAsync(attachments.Url);
+            //                        using (var attachStream = await httpClient.GetStreamAsync(attachments.Url))
+            //                        {
+            //                            using (var fileStream = File.Create(printedfile))
+            //                            {
+            //                                await attachStream.CopyToAsync(fileStream);
+            //                            }
+            //                        }
+            //                    }
+            //                }
+            //                catch (Exception ex)
+            //                {
+            //                    await e.Channel.SendMessageAsync($"Printer error: {ex}");
+            //                    return;
+            //                }
+
+            //                try
+            //                {
+            //                    file = SKBitmap.Decode(printedfile);
+
+            //                    using (var surface = SKSurface.Create(new SKImageInfo(file.Width, file.Height)))
+            //                    {
+            //                        using (SKCanvas canvas = surface.Canvas)
+            //                        {
+            //                            canvas.DrawBitmap(file, 0, 0);
+
+            //                            using (SKPaint paint = new SKPaint())
+            //                            {
+            //                                // Adjust saturation
+            //                                //paint.ColorFilter = SKColorFilter.CreateColorMatrix(new float[]
+            //                                //{
+            //                                //    0.6f, 0, 0, 0, 0,
+            //                                //    0, 0.6f, 0, 0, 0,
+            //                                //    0, 0, 0.6f, 0, 0,
+            //                                //    0, 0, 0, 1, 0
+            //                                //});
+
+            //                                // Adjust contrast
+            //                                paint.ImageFilter = SKImageFilter.CreateColorFilter(SKColorFilter.CreateHighContrast(true, SKHighContrastConfigInvertStyle.NoInvert, 1));
+
+            //                                // Draw the adjusted image onto the canvas
+            //                                canvas.DrawBitmap(file, SKRect.Create(file.Width, file.Height), paint);
+            //                            }
+
+            //                        }
+
+            //                        using (var coolfile = surface.Snapshot())
+            //                        using (var data = coolfile.Encode(SKEncodedImageFormat.Png, 100))
+            //                        using (var stream = File.OpenWrite(coolprinterfile))
+            //                        {
+            //                            data.SaveTo(stream);
+            //                        }
+            //                    }
+            //                }
+            //                catch (Exception ex)
+            //                {
+            //                    await e.Channel.SendMessageAsync($"Scanner error: {ex}");
+            //                    return;
+            //                }
+
+            //                await save.SendSilentAsync(e.Channel.Id, coolprinterfile);
+            //                await e.Channel.SendMessageAsync("Here you go..");
+            //            }
+            //            else
+            //            {
+            //                await e.Message.Channel.SendMessageAsync("The printer only accepts images..");
+            //                break;
+            //            }
+            //        }
+            //    }
+            //    else
+            //    {
+            //        await e.Message.Channel.SendMessageAsync("Photocopy *what* exactly?");
+            //    }
+            //}
+            #endregion
+
             return;
         }
     }
